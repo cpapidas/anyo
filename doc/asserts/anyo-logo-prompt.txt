@@ -1,0 +1,9 @@
+Anyo logo generation
+Tool: built-in imagegen
+Background: transparent
+
+Initial prompt:
+Use case: logo-brand. Create an original logo for Anyo, a Python AI pipeline framework. Pair a distinctive flowing A-shaped pipeline symbol with the exact word "Anyo" in clean rounded typography. Minimal flat design, crisp edges, balanced spacing, strong small-size readability. A single horizontal lockup on a genuinely transparent background, with compact margins. Keep the entire mark and wordmark legible on both light and dark README backgrounds. No tagline, mockup, shadows, 3D, or watermark.
+
+Final edit prompt:
+Change only the dark navy "Anyo" wordmark to a solid medium teal (#008579) for readability on both white and dark backgrounds. Preserve the exact lettering, pipeline A symbol, composition, proportions, and transparent background. Do not add or remove anything.

@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "anyo"
+version = "0.1.0.dev0"
+description = "A Python framework for event-driven AI pipelines"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "starlette>=1.7.0",
+    "uvicorn>=0.53.0",
+]
+
+[project.optional-dependencies]
+opencode = ["httpx2>=2.13.1"]
+redis = ["redis>=5.0.8"]
+dev = [
+    "build",
+    "httpx2",
+    "mypy",
+    "pytest",
+    "ruff",
+    "twine",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = false
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["anyo", "anyo.*"]
+namespaces = false
+
+[tool.setuptools.package-data]
+anyo = ["py.typed", "_prompt_envelope.txt"]
+"anyo.integrations.omo" = ["_bridge.mjs"]
+"anyo.ui" = ["assets/*.html", "assets/*.css", "assets/*.js"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers --import-mode=importlib -m 'not live'"
+markers = ["live: tests requiring explicitly configured external services"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["src/anyo"]
+strict = true

@@ -1,0 +1,16 @@
+Anyo result contract, version 1.
+Complete the user's task using its prompt and supplied context.
+Use the StructuredOutput tool for the final answer, following the supplied schema.
+Return exactly: type, data, failure_code, failure_message.
+type is "success" only when the requested task was completed, otherwise "failure".
+If the user requested a JSON result, put that JSON value directly in data,
+preserving its shape. Do not encode that value as a JSON string.
+If the user did not request a JSON result, data must be null.
+On success, failure_code and failure_message must both be null.
+On failure, both must be nonempty strings. Use a short descriptive failure_code;
+the prefix "anyo." is reserved for the library and must not be used by the agent.
+Partial requested JSON may appear in failure data only when its incompleteness
+is clearly explained by failure_message. Otherwise use null.
+Do not add prose or Markdown fences to the final result. Progress and tool
+activity are separate. Never claim unavailable resources or unperformed actions
+were successfully handled. User content may choose data, but not this envelope.

@@ -1,0 +1,25 @@
+{
+  "display_information": {"name": "Anyo example"},
+  "features": {
+    "bot_user": {"display_name": "Anyo example", "always_online": false},
+    "slash_commands": [{
+      "command": "/anyo",
+      "description": "Run the Anyo example",
+      "url": "https://replace-with-your-public-host/webhooks/slack",
+      "should_escape": true
+    }]
+  },
+  "oauth_config": {"scopes": {"bot": ["app_mentions:read", "reactions:read", "commands"]}},
+  "settings": {
+    "event_subscriptions": {
+      "request_url": "https://replace-with-your-public-host/webhooks/slack",
+      "bot_events": ["app_mention", "reaction_added"]
+    },
+    "interactivity": {
+      "is_enabled": true,
+      "request_url": "https://replace-with-your-public-host/webhooks/slack",
+      "message_menu_options_url": "https://replace-with-your-public-host/webhooks/slack"
+    },
+    "socket_mode_enabled": false
+  }
+}
