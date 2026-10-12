@@ -67,7 +67,8 @@ class _ProcessOutput:
 
 
 @pytest.mark.skipif(os.name != "posix", reason="Exercises POSIX graceful SIGTERM shutdown")
-def test_installed_main_serves_webhooks_and_drains_on_sigterm(tmp_path: Path) -> None:
+@pytest.mark.parametrize("hosting", ["start", "serve", "external"])
+def test_installed_main_serves_webhooks_and_drains_on_sigterm(tmp_path: Path, hosting) -> None:
     # This file runs outside the checkout and imports the installed distribution.
     # Standard input is a control channel for deterministic callback barriers.
     main = tmp_path / "main.py"
@@ -77,15 +78,43 @@ def test_installed_main_serves_webhooks_and_drains_on_sigterm(tmp_path: Path) ->
             """\
             import json
             import logging
+            import socket
             import sys
             import threading
+            from contextlib import asynccontextmanager
             from pathlib import Path
 
             import anyo
+            import uvicorn
+            from starlette.applications import Starlette
+            from starlette.middleware.base import BaseHTTPMiddleware
+            from starlette.responses import JSONResponse
+            from starlette.routing import Mount, Route
 
             logging.basicConfig(level=logging.INFO, stream=sys.stdout, format="%(message)s")
             started = threading.Event()
             release = threading.Event()
+            consumer = {"ready": False}
+            hosting = sys.argv[1]
+
+            @asynccontextmanager
+            async def resources(app):
+                consumer["ready"] = True
+                print("CONSUMER_STARTED", flush=True)
+                try:
+                    yield {"consumer": consumer}
+                finally:
+                    consumer["ready"] = False
+                    print("CONSUMER_STOPPED", flush=True)
+
+            async def health(request):
+                return JSONResponse({"ready": request.state.consumer["ready"]})
+
+            class ConsumerMiddleware(BaseHTTPMiddleware):
+                async def dispatch(self, request, call_next):
+                    response = await call_next(request)
+                    response.headers["x-consumer"] = "extended"
+                    return response
 
             def control():
                 for line in sys.stdin:
@@ -99,6 +128,8 @@ def test_installed_main_serves_webhooks_and_drains_on_sigterm(tmp_path: Path) ->
                 print("PIPELINE_STARTED", flush=True)
                 if not release.wait(30):
                     raise TimeoutError("Test callback was never released")
+                if hosting != "start":
+                    assert consumer["ready"], "Consumer resources closed before draining"
                 Path("result.json").write_text(json.dumps({
                     "delivery": event.delivery_id,
                     "repository": event.repository,
@@ -112,7 +143,28 @@ def test_installed_main_serves_webhooks_and_drains_on_sigterm(tmp_path: Path) ->
                 repository="repository", pipeline=pipeline,
             )
             threading.Thread(target=control, daemon=True).start()
-            anyo.start(port=0, workers=1)
+            if hosting == "start":
+                anyo.start(port=0, workers=1)
+            else:
+                http = anyo.asgi(workers=1, lifespan=resources)
+                http.routes.append(Route("/health", health))
+                http.add_middleware(ConsumerMiddleware)
+                if hosting == "serve":
+                    anyo.serve(http, port=0)
+                else:
+                    @asynccontextmanager
+                    async def host_lifespan(app):
+                        async with anyo.lifespan(http) as state:
+                            yield state
+
+                    host = Starlette(
+                        routes=[Mount("/anyo", http)], lifespan=host_lifespan
+                    )
+                    # The consumer owns the listener and server configuration.
+                    with socket.create_server(("127.0.0.1", 0)) as listener:
+                        print("Anyo listening on " + repr(listener.getsockname()), flush=True)
+                        server = uvicorn.Server(uvicorn.Config(host, log_config=None))
+                        server.run(sockets=[listener])
             """
         ),
         encoding="utf-8",
@@ -121,7 +173,7 @@ def test_installed_main_serves_webhooks_and_drains_on_sigterm(tmp_path: Path) ->
     environment.pop("PYTHONPATH", None)
     environment["ANYO_GITHUB_WEBHOOK_SECRET"] = SECRET
     process = subprocess.Popen(
-        [sys.executable, "-u", str(main)],
+        [sys.executable, "-u", str(main), hosting],
         cwd=tmp_path,
         env=environment,
         stdin=subprocess.PIPE,
@@ -143,6 +195,18 @@ def test_installed_main_serves_webhooks_and_drains_on_sigterm(tmp_path: Path) ->
         host, port = address
         assert host == "127.0.0.1" and port > 0
         output.wait_for(lambda line: line == "Application startup complete.")
+        prefix = "/anyo" if hosting == "external" else ""
+        if hosting != "start":
+            output.wait_for(lambda line: line == "CONSUMER_STARTED")
+            health_connection = http.client.HTTPConnection(host, port, timeout=TIMEOUT)
+            try:
+                health_connection.request("GET", prefix + "/health")
+                health_response = health_connection.getresponse()
+                assert health_response.status == 200
+                assert health_response.getheader("x-consumer") == "extended"
+                assert json.loads(health_response.read()) == {"ready": True}
+            finally:
+                health_connection.close()
         command("status")
         output.wait_for(lambda line: line == "STATUS_IDLE")
         assert not result.exists()
@@ -160,7 +224,7 @@ def test_installed_main_serves_webhooks_and_drains_on_sigterm(tmp_path: Path) ->
         try:
             connection.request(
                 "POST",
-                "/webhooks/github",
+                prefix + "/webhooks/github",
                 body=body,
                 headers={
                     "Content-Type": "application/json",
@@ -171,6 +235,8 @@ def test_installed_main_serves_webhooks_and_drains_on_sigterm(tmp_path: Path) ->
             )
             response = connection.getresponse()
             assert response.status == 202
+            if hosting != "start":
+                assert response.getheader("x-consumer") == "extended"
             assert json.loads(response.read()) == {"accepted": 1}
         finally:
             connection.close()
@@ -185,6 +251,9 @@ def test_installed_main_serves_webhooks_and_drains_on_sigterm(tmp_path: Path) ->
         command("release")
         output.wait_for(lambda line: line == "PIPELINE_COMPLETED")
         output.wait_for(lambda line: line == "Application shutdown complete.")
+        if hosting != "start":
+            output.wait_for(lambda line: line == "CONSUMER_STOPPED")
+            assert output.lines.index("PIPELINE_COMPLETED") < output.lines.index("CONSUMER_STOPPED")
         return_code = process.wait(timeout=TIMEOUT)
         # Uvicorn restores the original handler and re-raises SIGTERM only after
         # graceful shutdown has completed; a negative code is expected on POSIX.

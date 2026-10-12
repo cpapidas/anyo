@@ -42,6 +42,21 @@ The [operations guide](../docs/knowledge/operations-ui.md#start-a-local-dashboar
 
 Set `ANYO_ROLE=receiver` and `ANYO_ROLE=worker` in separate terminals to split execution. Both need the same queue URL, namespace, and registrations; only the receiver needs UI/webhook credentials. The example enables operations on every role and the UI on receiving roles. `ANYO_QUEUE_URL`, `ANYO_QUEUE_NAMESPACE`, `ANYO_HOST`, and `ANYO_PORT` select its deployment settings. See the [operations guide](../docs/knowledge/operations-ui.md) for HTTPS, retention, log coverage, cancellation, and upgrading existing queues.
 
+## Host and extend the HTTP application
+
+[http_hosting.py](http_hosting.py) mounts Anyo at `/anyo` inside a Starlette host. It adds `/health` on the host, `/anyo/service` on Anyo, a response-header middleware, and consumer startup/shutdown work. The pipeline prints the PR number without model calls.
+
+```sh
+export ANYO_GITHUB_WEBHOOK_SECRET='replace-with-a-long-random-secret'
+python -m uvicorn http_hosting:app --app-dir examples --lifespan on
+```
+
+Open `http://127.0.0.1:8000/health` or `/anyo/service`. To use Anyo's server with the same customized app, run `python examples/http_hosting.py` instead. `ANYO_HOST` and `ANYO_PORT` configure that convenience-server command. The external Uvicorn command takes its own listener options.
+
+The example defaults to repository `demo-owner/demo-repository`; set `ANYO_GITHUB_ORGANIZATION` and `ANYO_GITHUB_REPOSITORY` for real deliveries. Connect GitHub to `/anyo/webhooks/github`. `ANYO_QUEUE_URL` selects storage; the namespace is `hosted-review`. To enable `/anyo/ui/`, set `ANYO_UI_ENABLED=1` plus `ANYO_UI_USERNAME` and `ANYO_UI_PASSWORD`. These example environment switches are not automatic library configuration.
+
+[Hosting guide](../docs/wiki/http-hosting.md) explains the public APIs, lifecycle composition, route ownership, and process limits.
+
 ## Slack example
 
 [slack_webhook.py](slack_webhook.py) handles mentions, reactions, `/anyo`, a button, and external-menu option loads. The [Slack setup guide](../docs/knowledge/slack-hooks.md) explains its environment variables, signing secret, request URLs, scopes, installation, and response handlers. Start from [slack-app-manifest.json](slack-app-manifest.json) after replacing its placeholder HTTPS URLs. It requests only the example's three bot scopes; broader hooks need the subscriptions and permissions in the [coverage inventory](../docs/tasks/slack-hooks/coverage.md).

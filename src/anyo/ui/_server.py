@@ -11,7 +11,7 @@ import time
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from importlib.resources import files
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse, RedirectResponse, Response
@@ -34,6 +34,12 @@ _HEADERS = {
         "form-action 'self'; frame-ancestors 'none'"
     ),
 }
+
+
+def _ui_path(request: Request) -> str:
+    """External dashboard path, including mounts and an ASGI proxy prefix."""
+    root = request.scope.get("root_path", "").rstrip("/")
+    return quote(f"{root}/ui", safe="/")
 
 
 @dataclass(frozen=True)
@@ -170,7 +176,7 @@ class Dashboard:
             _COOKIE,
             token,
             max_age=_SESSION_SECONDS,
-            path="/ui",
+            path=_ui_path(request),
             httponly=True,
             secure=request.url.scheme == "https",
             samesite="strict",
@@ -179,8 +185,11 @@ class Dashboard:
 
     async def _handle(self, request: Request) -> Response:
         path = request.url.path
+        root = request.scope.get("root_path", "").rstrip("/")
+        if root and path.startswith(root + "/"):
+            path = path[len(root) :]
         if path == "/ui":
-            return RedirectResponse("/ui/", 307)
+            return RedirectResponse(_ui_path(request) + "/", 307)
         if path.startswith("/ui/assets/"):
             name = request.path_params["asset"]
             media = {"ui.js": "text/javascript", "ui.css": "text/css"}
@@ -209,7 +218,7 @@ class Dashboard:
         if path == "/ui/logout":
             self._sessions.pop(request.cookies.get(_COOKIE, ""), None)
             response = JSONResponse({"ok": True})
-            response.delete_cookie(_COOKIE, path="/ui")
+            response.delete_cookie(_COOKIE, path=_ui_path(request))
             return response
         resource = request.path_params.get("resource")
         if resource == "session" and request.method == "GET":

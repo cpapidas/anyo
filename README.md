@@ -80,6 +80,7 @@ Anyo listens on `127.0.0.1:8000` and saves jobs in `.anyo/queue.sqlite3`. Everyt
 - [Run an AI prompt](docs/wiki/run-prompts.md) or [prepare repository files](docs/wiki/repository-workspaces.md).
 - [Choose SQLite or Redis](docs/wiki/workers.md) or [run separate workers](docs/wiki/separate-workers.md).
 - [Open the dashboard](docs/wiki/operations-ui.md).
+- [Use your HTTP server or add routes](docs/wiki/http-hosting.md).
 - [Understand deliveries and retries](docs/wiki/delivery.md).
 - [Develop Anyo](docs/wiki/development.md).
 

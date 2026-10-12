@@ -5,12 +5,15 @@ import hashlib
 import hmac
 import json
 import threading
+from contextlib import asynccontextmanager
 
 import pytest
+from starlette.applications import Starlette
 from starlette.requests import Request
+from starlette.routing import Mount
 from starlette.testclient import TestClient
 
-from anyo import HookResponse
+from anyo import HookResponse, lifespan
 from anyo.application import Application
 from anyo.integrations.github import GitHubProvider
 from anyo.integrations.slack import SlackEvent, SlackProvider
@@ -21,9 +24,39 @@ from .conftest import (
     add,
     command_payload,
     deliver,
+    encoded,
     event_payload,
     interaction_payload,
+    signed,
 )
+
+
+def test_mounted_slack_responder_preserves_reply_and_duplicate_replay(app):
+    immediate, pipelines = [], []
+
+    async def answer(event):
+        immediate.append(event)
+        return HookResponse({"text": "Accepted by the mounted app"}, dispatch=False)
+
+    add(app, pipelines.append, action="slash_command", command="/anyo", responder=answer)
+    child = app.asgi()
+
+    @asynccontextmanager
+    async def host_lifespan(host):
+        async with lifespan(child):
+            yield
+
+    host = Starlette(routes=[Mount("/anyo", child)], lifespan=host_lifespan)
+    body, content_type = encoded(command_payload(), "form")
+    with TestClient(host) as client:
+        for _ in range(2):
+            response = client.post(
+                "/anyo/webhooks/slack", content=body, headers=signed(body, content_type)
+            )
+            assert response.status_code == 200
+            assert response.headers["content-type"] == "application/json"
+            assert response.json() == {"text": "Accepted by the mounted app"}
+    assert len(immediate) == 1 and not pipelines
 
 
 def test_events_fan_out_dedupe_and_copy_payloads(app):

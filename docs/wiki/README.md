@@ -16,6 +16,7 @@ Pick what you want to do. Each guide gives you a short example and links to more
 | Run an AI prompt | [OpenCode and OmO](run-prompts.md) |
 | Choose a queue or limit concurrency | [SQLite and Redis](workers.md) |
 | Run one receiver and two workers | [Separate workers](separate-workers.md) |
+| Use my HTTP server or add routes | [Hosting and HTTP extensions](http-hosting.md) |
 | View runs, logs, and controls | [Dashboard](operations-ui.md) |
 | Understand duplicate events and retries | [Delivery behavior](delivery.md) |
 | Change or test Anyo | [Development](development.md) |

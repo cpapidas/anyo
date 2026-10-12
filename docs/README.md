@@ -28,6 +28,7 @@ Start with the [wiki](wiki/README.md) for short how-to guides and examples. This
 
 ## Task index
 
+- [Embed Anyo in a host application and extend its HTTP app](tasks/embeddable-http-application/plan.md) — `done`; public app access, external hosting, routes and middleware, composed lifecycle, and mounted dashboard support; 878 installed-wheel tests, real HTTP/Redis checks, and browser verification passed. [Hosting guide](wiki/http-hosting.md).
 - [Start pipelines from Notion events](tasks/notion-hooks/plan.md) — `done`; signed webhooks, setup-only token collection, native event filters, and durable transport; 858 installed-wheel tests plus two real Redis worker checks passed. [Research and platform limits](tasks/notion-hooks/research.md).
 - [Start pipelines from Better Stack incidents and errors](tasks/betterstack-hooks/plan.md) — `done`; authenticated incident/error hooks, typed events, SQLite/Redis workers, and setup example; 721 tests passed against the installed wheel plus two real Redis worker checks. [Research and platform limits](tasks/betterstack-hooks/research.md).
 - [Clone repositories and reuse cached Git data across workers](tasks/repository-workspaces/plan.md) — `done`; exact-commit workspaces, persistent caches, cleanup, bundle seeds, and runnable project/worker examples; verified installed wheel, SQLite/Redis workers, and container replacement.

@@ -11,6 +11,7 @@ Anyo is a Python library for AI pipelines written in code. This page separates w
 - Repository checkouts at exact commits, with cached Git data shared across workers.
 - SQLite or Redis queues, with optional separate workers.
 - A protected dashboard for runs, logs, retries, and worker controls.
+- [External HTTP hosting and app extensions](http-hosting.md), including mounted webhooks and dashboards.
 
 Anyo uses Python 3.12 or later, one import package under `src/anyo/`, Starlette, and Uvicorn. Each hook provider has its own package under `src/anyo/integrations/`.
 

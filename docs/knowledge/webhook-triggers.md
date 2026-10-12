@@ -73,9 +73,35 @@ Secrets are passed per hook as `secret=...` or resolved at startup from `ANYO_GI
 
 GitHub repository webhooks are configured manually in this version. The consumer supplies a publicly reachable HTTPS URL through deployment or a local forwarding tool, subscribes to pull request events, selects JSON, and sets the matching secret. No GitHub API token is needed to receive deliveries; pipeline code needs its own credentials if it calls GitHub APIs. Starting Anyo does not provision a public URL, register remote webhooks, or perform checkout.
 
-`Application.asgi(**runtime_options)` returns a Starlette application for in-process tests or an existing ASGI host; its lifespan must be used and its backend must be asyncio. `Application.start(...)` uses that same application for roles `all`/`receiver` and owns its listening socket. `Application.worker(...)` and `anyo.worker(...)` provide an async worker context without HTTP; `start(role="worker")` owns its blocking process lifecycle. Bind errors propagate as exceptions. Startup inside an already running event loop is rejected with guidance to use the ASGI application. The library does not configure the root logger, change working directory, or call `sys.exit`.
+`Application.asgi(**runtime_options)` and `anyo.asgi(**runtime_options)` return a Starlette application for in-process tests or an existing ASGI host; its lifespan must be used and its backend must be asyncio. `Application.start(...)` uses the same builder for roles `all`/`receiver` and owns its listening socket. `Application.worker(...)` and `anyo.worker(...)` provide an async worker context without HTTP; `start(role="worker")` owns its blocking process lifecycle. Bind errors propagate as exceptions. Startup inside an already running event loop is rejected with guidance to use the ASGI application. The library does not configure the root logger, change working directory, or call `sys.exit`.
+
+Use `anyo.serve(app, host="127.0.0.1", port=8000)` to serve an already customized HTTP app. `start()` continues to build its own app; it does not serve a previously returned object.
 
 On normal durable shutdown or the first interrupt, stop admission/claims, finish owned active attempts, and preserve unclaimed backlog for remaining or restarted workers. Memory mode retains its full drain of accepted work. There is no forced pipeline timeout: Python cannot safely kill arbitrary synchronous functions. Consumers must put deadlines on their own external calls; a hung callback can delay shutdown. Forced termination leaves durable work for lease recovery and can lose memory-mode work. ASGI hosts control their own lifecycle.
+
+## Embedding and HTTP extension
+
+The [hosting guide](../wiki/http-hosting.md) and [runnable example](../../examples/http_hosting.py) demonstrate these public APIs, implemented by the [embedding task](../tasks/embeddable-http-application/plan.md):
+
+| API | Contract |
+| --- | --- |
+| `anyo.create_application(*, queue_url="sqlite:///.anyo/queue.sqlite3")` | Return a fresh `Application` with built-in providers, harnesses, and SQLite/Redis queue factories. Construction is inert. The advanced `Application` constructor still accepts explicit adapters and defaults to memory. |
+| `anyo.asgi(...)` / `Application.asgi(...)` | Return a fresh Starlette HTTP object over the corresponding registry. Package-level registration and harness configuration feed the package-level ASGI app. Configure runtime options here. |
+| `asgi(lifespan=resources)` | Accept a Starlette lifespan context-manager function. Claim/freeze the registry, enter consumer resources, then start Anyo's runtime. On exit, stop admission and close response tasks, drain workers, close owned queue/harness resources, then exit consumer resources and release the registry. An optional yielded mapping becomes request state. |
+| `anyo.lifespan(http_app)` | Return an async context manager for the HTTP app's lifecycle. Enter it in the parent lifespan for a mounted app. It yields the child lifespan's mapping or `None`; a host must explicitly forward or merge any request state it needs. |
+| `anyo.serve(app, *, host="127.0.0.1", port=8000)` | Run exactly the supplied ASGI callable with Anyo's blocking Uvicorn configuration. Accept a Starlette app, middleware wrapper, or parent host with mounted apps. Own only this server's loop/listener and its normal signal handling; enable ASGI lifespan. Runtime settings belong to the app, so duplicate runtime keywords are rejected by the function signature. |
+
+`Application`, `create_application`, `asgi`, `lifespan`, and `serve` are public root imports; the advanced lifecycle/serving helpers also live in `anyo.application`. The helpers do not introduce a new HTTP framework or change dependency extras. Starlette and Uvicorn remain included in the base install.
+
+Only one HTTP or worker lifespan may own a registry at a time, even if multiple HTTP objects have been built from it. Concurrent startup is rejected before entering consumer resources. Sequential lifespans are allowed, including after failed startup or cancellation. Existing hooks persist; durable history remains, while memory history resets. Separate registries need separate queue URLs or namespaces if their durable jobs must be independent. Callback closures, borrowed clients, and external resources remain consumer-owned.
+
+Customize routes and middleware before startup. Anyo's provider route and optional `/ui` routes are registered first; Starlette's route order applies. Appending a duplicate path will not override an earlier Anyo route. Overriding those routes or applying blanket host authentication can bypass or block Anyo's contracts and is consumer responsibility. Middleware must preserve raw signed bodies and credential headers. Live mutation of hooks, routes, or middleware is not a supported reconfiguration interface.
+
+Mounting under `/anyo` exposes `/anyo/webhooks/{provider}` and `/anyo/ui/`. The dashboard uses relative asset/browser URLs and the ASGI root path for redirects and session-cookie paths. Distinct mounts have separate dashboard session stores and cookie paths. The host must run each child's lifespan exactly once; copying routes into another app without lifecycle composition is insufficient. Mounting the same HTTP object at several prefixes concurrently is not a separate application-isolation mechanism.
+
+An external host owns its sockets, event loop, signal policy, proxy trust, and logging. `asgi()` and `lifespan()` do not run a server or take over those resources. The host must forward a correct external scheme/host and ASGI `root_path` when using a reverse proxy so dashboard redirects, secure cookies, and CSRF checks agree. Authentication and webhook limits remain enforced by the same receiver in every hosting mode.
+
+Use an asyncio ASGI host with lifespan enabled. No WSGI adapter or transport-neutral webhook API is introduced. `workers` still means pipeline concurrency per receiving process in role `all`, not HTTP server processes. Durable queue deduplication can span compatible processes, but responder replay caches and dashboard sessions remain process-local; session sharing, sticky routing, and external server process management remain deployment responsibilities. Receiver-only hosting and independent workers retain their existing contracts.
 
 ## Reception and execution
 
@@ -101,3 +127,4 @@ The initial baseline is Python 3.12, with standard `venv`/`pip`, setuptools for 
 - [GitHub webhook practices](https://docs.github.com/en/webhooks/using-webhooks/best-practices-for-using-webhooks) and [signature verification](https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries): authentication, prompt acknowledgment, and delivery identity constraints.
 
 - Project conversation, 2026-10-04 (no share link supplied): authorized the [SQLite and Redis worker task](../tasks/sqlite-redis-workers/plan.md); [worker queues](worker-queues.md) record its implemented execution contract.
+- Project conversation, 2026-10-12 (no share link supplied): requested the embedding/extension task and then authorized implementation. The [task](../tasks/embeddable-http-application/plan.md) records verification and limits for the public hosting APIs.

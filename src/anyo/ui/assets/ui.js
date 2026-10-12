@@ -8,17 +8,17 @@ if (login) {
   login.addEventListener("submit", async (event) => {
     event.preventDefault(); const button = login.querySelector("button"); button.disabled = true; $("login-error").textContent = "";
     try {
-      const response = await fetch("/ui/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: $("username").value, password: $("password").value }) });
+      const response = await fetch("login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: $("username").value, password: $("password").value }) });
       const data = await response.json(); if (!response.ok) throw new Error(data.error || "Unable to sign in.");
-      $("password").value = ""; window.location.replace("/ui/");
+      $("password").value = ""; window.location.replace("./");
     } catch (error) { $("login-error").textContent = error.message; } finally { button.disabled = false; }
   });
 } else {
   const state = { csrf: "", runs: [], workers: [], view: "runs", selected: null, visible: 100, busy: false, stale: 60, logCursor: 0, detailCursor: 0, logCount: 0, detailCount: 0, logGeneration: 0, detailGeneration: 0, filters: {}, noticeTimer: null };
   const status = (value) => node("span", value === "running-worker" ? "running" : value, `status ${value}`);
   async function api(path, method = "GET", body = undefined) {
-    const response = await fetch(`/ui/${path}`, { method, headers: method === "POST" ? { "X-Anyo-CSRF": state.csrf, "Content-Type": "application/json" } : {}, body: body === undefined ? undefined : JSON.stringify(body), cache: "no-store" });
-    if (response.status === 401) { window.location.replace("/ui/"); throw new Error("Session expired."); }
+    const response = await fetch(`./${path}`, { method, headers: method === "POST" ? { "X-Anyo-CSRF": state.csrf, "Content-Type": "application/json" } : {}, body: body === undefined ? undefined : JSON.stringify(body), cache: "no-store" });
+    if (response.status === 401) { window.location.replace("./"); throw new Error("Session expired."); }
     const data = await response.json(); if (!response.ok) throw new Error(data.error || "Request failed."); return data;
   }
   function notice(text) { $("notice").textContent = text; $("notice").hidden = false; clearTimeout(state.noticeTimer); state.noticeTimer = setTimeout(() => { $("notice").hidden = true; }, 10000); }
@@ -124,6 +124,6 @@ if (login) {
   function applyFilters() { state.filters = {}; for (const [id, key] of [["log-run", "run_id"], ["log-worker", "worker_id"], ["log-source", "source"], ["log-level", "level"]]) if ($(id).value.trim()) state.filters[key] = $(id).value.trim(); state.logCursor = 0; state.logCount = 0; state.logGeneration++; $("logs-output").replaceChildren(); $("log-gap").hidden = true; fetchLogs().catch(fail); }
   $("apply-log-filters").addEventListener("click", applyFilters); $("log-follow").addEventListener("change", refresh);
   $("detail-open-logs").addEventListener("click", () => { $("log-run").value = state.selected; $("log-worker").value = ""; $("log-source").value = ""; $("log-level").value = ""; applyFilters(); switchView("logs"); });
-  $("logout").addEventListener("click", async () => { try { await api("logout", "POST"); window.location.replace("/ui/"); } catch (error) { fail(error); } });
+  $("logout").addEventListener("click", async () => { try { await api("logout", "POST"); window.location.replace("./"); } catch (error) { fail(error); } });
   api("api/session").then((session) => { state.csrf = session.csrf; state.stale = session.stale_seconds; $("namespace").textContent = session.namespace; refresh(); setInterval(() => { if (!document.hidden) refresh(); }, 2000); }).catch(fail);
 }

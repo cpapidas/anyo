@@ -5,7 +5,8 @@
 An operator needs to see which pipelines are running, read their output, and stop work that has become stuck. Anyo's optional browser UI provides these controls while pipeline definitions remain in Python. This guide explains setup, execution modes, log coverage, and the limits of remote control.
 
 Status: accepted  
-Last updated: 2026-10-11  
+Last updated: 2026-10-12
+
 Scope: implemented UI and operations contract; final verification is recorded in the [operations UI task](../tasks/protected-operations-ui/plan.md).
 
 ## Start a local dashboard
@@ -131,9 +132,11 @@ def pipeline(event):
     # Initialize per-attempt resources here.
     ...
 
+
 def main():
     # Register pipeline and configure the harness before startup.
     anyo.start(ui=True, execution_mode="process")
+
 
 if __name__ == "__main__":
     main()
@@ -170,6 +173,8 @@ The dashboard supports one environment-configured operator account. Login create
 
 Use HTTPS for remote access. Configure TLS on an ASGI host or a reverse proxy, preserve the public host, and configure trusted proxy headers so the ASGI request reports the public HTTPS scheme. Trust only your actual proxy addresses; otherwise cookie security and origin checks cannot rely on those headers. The convenience startup does not provision certificates or a reverse proxy. Keep `/ui/` on the same origin as its APIs and assets. Provider webhooks continue using their own signatures and do not send the UI cookie or CSRF token.
 
+The dashboard also works inside a consumer-owned asyncio ASGI host. Enable it with `asgi(ui=True)` and compose the child lifespan as described in [HTTP hosting](../wiki/http-hosting.md). A mount at `/anyo` exposes `/anyo/ui/`; relative assets/API requests, redirects, and the cookie's path follow the mount and ASGI `root_path`. Independent mounted apps have separate sessions and cookie paths. Proxy scheme/host configuration and process-local session limits still apply.
+
 Changing environment credentials takes effect when the receiver restarts. There is no account database, SSO, or operator role system in this UI.
 
 ## Upgrade an existing queue
@@ -183,3 +188,4 @@ Drain active work, inspect uncertain attempts, and stop all participating proces
 - Project conversation, 2026-10-11 (no share link supplied): requested a protected UI with environment credentials, run and worker controls, OpenCode/OmO/general logs, and then authorized implementation.
 - [Operations UI task](../tasks/protected-operations-ui/plan.md), [worker contract](worker-queues.md), [webhook contract](webhook-triggers.md), [OpenCode guide](opencode-prompts.md), and [native OmO guide](omo-prompts.md).
 - Implemented application, execution, storage, UI, and observability contracts; controlled fixture verification is recorded in the task rather than presented as live model validation.
+- [Embedding task](../tasks/embeddable-http-application/plan.md), authorized on 2026-10-12: mounted path handling, independent app sessions, and browser verification using an installed wheel.

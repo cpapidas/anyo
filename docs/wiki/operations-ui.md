@@ -35,6 +35,8 @@ Use `execution_mode="thread"` for the default execution mode. A stuck synchronou
 
 The dashboard needs SQLite or Redis and is off by default. Use HTTPS when accessing it remotely.
 
+To serve the dashboard inside your own application, use `asgi(ui=True)` and follow [HTTP hosting](http-hosting.md). A mount at `/anyo` puts the dashboard at `/anyo/ui/`; its assets, API calls, and session cookie follow that prefix.
+
 ## Use separate workers
 
 Use the same hooks, queue URL, and namespace in each process. After registration, the receiver uses:
