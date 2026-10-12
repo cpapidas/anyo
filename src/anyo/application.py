@@ -11,8 +11,8 @@ import re
 import signal
 import socket
 import threading
-from collections.abc import AsyncIterator, Iterable, Mapping
-from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator, Iterable, Iterator, Mapping
+from contextlib import AbstractAsyncContextManager, asynccontextmanager, contextmanager
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Literal
@@ -22,6 +22,7 @@ from starlette.applications import Starlette
 from starlette.requests import ClientDisconnect, Request
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
+from starlette.types import ASGIApp, Lifespan
 
 from anyo.agents import Harness, HarnessBuilder, prompt_scope
 from anyo.execution import (
@@ -52,9 +53,66 @@ from anyo.hooks import (
 )
 from anyo.ui._server import Dashboard, UICredentials
 
-__all__ = ["Application"]
+__all__ = ["Application", "lifespan", "serve"]
 
 logger = logging.getLogger(__name__)
+
+
+def lifespan(app: Starlette) -> AbstractAsyncContextManager[Mapping[str, object] | None]:
+    """Run an HTTP app's lifecycle inside the host's asyncio lifespan.
+
+    Mounting an app does not start its lifecycle. Enter this context once for
+    each mounted Anyo app, before the host accepts requests. Exiting drains
+    Anyo's owned work without stopping the host. If the app yields request
+    state, the host may forward it by yielding the returned mapping itself.
+    Concurrent lifespans over one Anyo registry are rejected.
+    """
+    return app.router.lifespan_context(app)
+
+
+def serve(app: ASGIApp, *, host: str = "127.0.0.1", port: int = 8000) -> None:
+    """Serve the supplied ASGI app unchanged with Anyo's blocking HTTP server.
+
+    Configure Anyo's runtime when constructing the app with ``asgi``. This
+    function accepts an extended app, a middleware wrapper, or a parent host
+    with mounted apps and a composed lifespan. It owns its socket and server
+    loop; use an external ASGI server instead when those belong to the host.
+    Bind failures raise ``OSError``; server startup failures and calls inside
+    an existing event loop raise ``RuntimeError``. Root logging is unchanged.
+    """
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        pass
+    else:
+        raise RuntimeError("serve() cannot run inside an event loop; use an ASGI host")
+    if not callable(app):
+        raise TypeError("app must be an ASGI callable")
+    if not isinstance(host, str) or not host.strip():
+        raise ValueError("host must be a nonempty string")
+    if type(port) is not int or not 0 <= port <= 65535:
+        raise ValueError("port must be an integer between 0 and 65535")
+    # Bind here so failures remain exceptions instead of CLI SystemExit.
+    family = socket.AF_INET6 if ":" in host else socket.AF_INET
+    with socket.create_server((host, port), family=family) as listener:
+        config = uvicorn.Config(
+            app,
+            log_config=None,
+            access_log=False,
+            loop="asyncio",
+            lifespan="on",
+            ws="none",
+            proxy_headers=False,
+            server_header=False,
+        )
+        server = uvicorn.Server(config)
+        logger.info("Anyo listening on %s", listener.getsockname())
+        try:
+            server.run(sockets=[listener])
+        except SystemExit as exc:
+            raise RuntimeError("Anyo server failed to start") from exc
+        if not server.started:
+            raise RuntimeError("Anyo server did not start")
 
 
 def _operations(
@@ -356,6 +414,7 @@ class Application:
         ui: bool = False,
         operations: bool | OperationsSettings = False,
         execution_mode: Literal["thread", "process"] = "thread",
+        lifespan: Lifespan[Starlette] | None = None,
     ) -> Starlette:
         """Build an ASGI application; its asyncio lifespan owns the dispatcher.
 
@@ -363,6 +422,12 @@ class Application:
         tests and ASGI hosts. Durable history persists across lifespans; memory
         mode resets it. ``app.state.dispatcher`` exposes inspection/wait helpers.
         Role is ``all`` or ``receiver``; worker-only use needs no ASGI host.
+
+        Each call builds a new HTTP app over this registry; only one may run
+        at a time. Add routes and middleware before serving. An optional
+        ``lifespan`` context starts consumer resources before Anyo and closes
+        them after Anyo drains; its mapping becomes Starlette request state.
+        When mounting the result, use ``anyo.lifespan(app)`` in the host lifespan.
         """
         settings = _Settings(
             workers,
@@ -384,7 +449,7 @@ class Application:
         settings.validate()
         if role == "worker":
             raise ValueError("Use Application.worker() or start(role='worker') without HTTP")
-        return self._build_asgi(settings)
+        return self._build_asgi(settings, lifespan=lifespan)
 
     def _dispatcher(self, settings: _Settings, hooks: list[Hook]) -> Dispatcher | DurableDispatcher:
         if settings.queue_url == "memory://":
@@ -427,43 +492,52 @@ class Application:
         )
 
     def _build_asgi(
-        self, settings: _Settings, prepared: tuple[tuple[Hook, str], ...] | None = None
+        self,
+        settings: _Settings,
+        prepared: tuple[tuple[Hook, str], ...] | None = None,
+        *,
+        lifespan: Lifespan[Starlette] | None = None,
     ) -> Starlette:
         dispatcher: Dispatcher | DurableDispatcher | None = None
         responses: ResponseDispatcher | None = None
         registrations: tuple[tuple[Hook, str], ...] = ()
 
-        @asynccontextmanager
-        async def lifespan(app: Starlette) -> AsyncIterator[None]:
-            nonlocal dispatcher, responses, registrations
+        @contextmanager
+        def claim() -> Iterator[None]:
+            nonlocal registrations
             # A supplied snapshot is already claimed by start(); otherwise this
-            # lifespan owns the claim and releases it even when startup fails.
+            # context claims before consumer startup can acquire resources.
             registrations = self._claim() if prepared is None else prepared
             try:
-                current = self._dispatcher(settings, [hook for hook, _ in registrations])
-                immediate = ResponseDispatcher(
-                    workers=settings.workers,
-                    max_records=settings.max_records,
-                    retention_seconds=settings.retention_seconds,
-                )
-                async with prompt_scope(self._harness if settings.role == "all" else None):
-                    await current.start()
-                    dispatcher = current
-                    responses = immediate
-                    app.state.dispatcher = current
-                    try:
-                        yield
-                    finally:
-                        dispatcher = None
-                        responses = None
-                        try:
-                            await immediate.close()
-                        finally:
-                            await current.close()
+                yield
             finally:
                 registrations = ()
                 if prepared is None:
                     self._release()
+
+        @asynccontextmanager
+        async def runtime_lifespan(app: Starlette) -> AsyncIterator[None]:
+            nonlocal dispatcher, responses
+            current = self._dispatcher(settings, [hook for hook, _ in registrations])
+            immediate = ResponseDispatcher(
+                workers=settings.workers,
+                max_records=settings.max_records,
+                retention_seconds=settings.retention_seconds,
+            )
+            async with prompt_scope(self._harness if settings.role == "all" else None):
+                await current.start()
+                dispatcher = current
+                responses = immediate
+                app.state.dispatcher = current
+                try:
+                    yield
+                finally:
+                    dispatcher = None
+                    responses = None
+                    try:
+                        await immediate.close()
+                    finally:
+                        await current.close()
 
         async def receive(request: Request) -> Response:
             if isinstance(dispatcher, DurableDispatcher):
@@ -604,7 +678,27 @@ class Application:
                 stale_seconds=max(5, settings.lease_seconds * 2),
             )
             routes.extend(dashboard.routes())
-        return Starlette(routes=routes, lifespan=lifespan)
+        if lifespan is None:
+
+            @asynccontextmanager
+            async def default_lifespan(app: Starlette) -> AsyncIterator[None]:
+                with claim():
+                    async with runtime_lifespan(app):
+                        yield
+
+            return Starlette(routes=routes, lifespan=default_lifespan)
+
+        @asynccontextmanager
+        async def composed_lifespan(app: Starlette) -> AsyncIterator[Mapping[str, object]]:
+            # Consumer resources outlive workers that may borrow them. Both
+            # contexts unwind on startup failure and cancellation as well.
+            assert lifespan is not None
+            with claim():
+                async with lifespan(app) as state:
+                    async with runtime_lifespan(app):
+                        yield state if state is not None else {}
+
+        return Starlette(routes=routes, lifespan=composed_lifespan)
 
     @staticmethod
     async def _read_body(request: Request, settings: _Settings) -> bytes:
@@ -714,28 +808,7 @@ class Application:
         prepared = self._claim()
         try:
             app = self._build_asgi(settings, prepared)
-            # Bind ourselves so failures raise OSError instead of Uvicorn's
-            # command-line SystemExit, and always close our owned socket.
-            family = socket.AF_INET6 if ":" in host else socket.AF_INET
-            with socket.create_server((host, port), family=family) as listener:
-                config = uvicorn.Config(
-                    app,
-                    log_config=None,
-                    access_log=False,
-                    loop="asyncio",
-                    lifespan="on",
-                    ws="none",
-                    proxy_headers=False,
-                    server_header=False,
-                )
-                server = uvicorn.Server(config)
-                logger.info("Anyo listening on %s", listener.getsockname())
-                try:
-                    server.run(sockets=[listener])
-                except SystemExit as exc:
-                    raise RuntimeError("Anyo server failed to start") from exc
-                if not server.started:
-                    raise RuntimeError("Anyo server did not start")
+            serve(app, host=host, port=port)
         finally:
             self._release()
 

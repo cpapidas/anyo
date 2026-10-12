@@ -6,11 +6,17 @@ import hmac
 import json
 import logging
 import time
+from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import replace
+from html.parser import HTMLParser
+from urllib.parse import urljoin
 
 import pytest
+from starlette.applications import Starlette
+from starlette.routing import Mount
 from starlette.testclient import TestClient
 
+import anyo
 from anyo.application import Application
 from anyo.execution import OperationsSettings
 from anyo.execution._operations import WorkerInfo
@@ -45,7 +51,7 @@ def app(tmp_path, monkeypatch):
     return instance
 
 
-def delivery(client, identity="one"):
+def delivery(client, identity="one", *, prefix=""):
     body = json.dumps(
         {
             "action": "opened",
@@ -55,7 +61,7 @@ def delivery(client, identity="one"):
         }
     ).encode()
     return client.post(
-        "/webhooks/github",
+        f"{prefix}/webhooks/github",
         content=body,
         headers={
             "x-github-event": "pull_request",
@@ -66,12 +72,110 @@ def delivery(client, identity="one"):
     )
 
 
-def login(client):
-    response = client.post("/ui/login", json={"username": "operator", "password": PASSWORD})
+def login(client, *, prefix=""):
+    response = client.post(
+        f"{prefix}/ui/login", json={"username": "operator", "password": PASSWORD}
+    )
     assert response.status_code == 200
-    session = client.get("/ui/api/session")
+    session = client.get(f"{prefix}/ui/api/session")
     assert session.status_code == 200
     return {"x-anyo-csrf": session.json()["csrf"]}
+
+
+class AssetLinks(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.paths = []
+
+    def handle_starttag(self, tag, attrs):
+        values = dict(attrs)
+        if tag == "script" and "src" in values:
+            self.paths.append(values["src"])
+        if tag == "link" and values.get("rel") == "stylesheet":
+            self.paths.append(values["href"])
+
+
+@pytest.mark.parametrize(
+    ("mount", "root_path"),
+    [("", ""), ("/anyo", ""), ("/nested/anyo", "/proxy"), ("/space here", "")],
+)
+def test_dashboard_mount_paths_assets_cookies_and_controls(app, mount, root_path):
+    child = app.asgi(ui=True, role="receiver")
+
+    @asynccontextmanager
+    async def host_lifespan(host):
+        async with anyo.lifespan(child):
+            yield
+
+    host = Starlette(routes=[Mount(mount or "/", child)], lifespan=host_lifespan)
+    prefix = root_path + mount
+    with TestClient(host, root_path=root_path, base_url="https://testserver") as client:
+        redirect = client.get(f"{prefix}/ui", follow_redirects=False)
+        assert redirect.status_code == 307
+        assert redirect.headers["location"] == prefix.replace(" ", "%20") + "/ui/"
+        page = client.get(redirect.headers["location"])
+        assert "login-form" in page.text
+        parser = AssetLinks()
+        parser.feed(page.text)
+        assert len(parser.paths) == 2
+        for path in parser.paths:
+            url = urljoin(str(page.url), path)
+            assert client.get(url).status_code == 200
+        assert client.get(f"{prefix}/ui/api/runs").status_code == 401
+        assert delivery(client, prefix=prefix).status_code == 202
+        headers = login(client, prefix=prefix)
+        cookie = next(iter(client.cookies.jar))
+        assert cookie.path == prefix.replace(" ", "%20") + "/ui"
+        assert cookie.secure
+        assert "runs-view" in client.get(f"{prefix}/ui/").text
+        runs = client.get(f"{prefix}/ui/api/runs").json()["runs"]
+        assert len(runs) == 1
+        action = f"{prefix}/ui/api/runs/{runs[0]['id']}/cancel"
+        assert client.post(action).status_code == 403
+        assert (
+            client.post(
+                action, headers=headers, json={"expected_token": runs[0]["attempt_token"]}
+            ).status_code
+            == 202
+        )
+        assert client.get(f"{prefix}/ui/api/runs").json()["runs"][0]["status"] == "cancelled"
+        response = client.post(f"{prefix}/ui/logout", headers=headers)
+        assert response.status_code == 200
+        assert not list(client.cookies.jar)
+        assert client.get(f"{prefix}/ui/api/runs").status_code == 401
+
+
+def test_dashboard_sessions_and_csrf_are_isolated_between_mounts(app, tmp_path):
+    other = anyo.create_application(queue_url=f"sqlite:///{tmp_path / 'other.sqlite3'}")
+    other.add_hook(
+        provider="github",
+        action="pr_created",
+        organization="org",
+        repository="repo",
+        pipeline=lambda event: None,
+        secret=SECRET,
+        hook_id="other",
+    )
+    first = app.asgi(ui=True, role="receiver")
+    second = other.asgi(ui=True, role="receiver")
+
+    @asynccontextmanager
+    async def host_lifespan(host):
+        async with AsyncExitStack() as stack:
+            await stack.enter_async_context(anyo.lifespan(first))
+            await stack.enter_async_context(anyo.lifespan(second))
+            yield
+
+    host = Starlette(routes=[Mount("/one", first), Mount("/two", second)], lifespan=host_lifespan)
+    with TestClient(host) as client:
+        one = login(client, prefix="/one")
+        assert client.get("/two/ui/api/session").status_code == 401
+        two = login(client, prefix="/two")
+        assert {cookie.path for cookie in client.cookies.jar} == {"/one/ui", "/two/ui"}
+        assert client.post("/two/ui/logout", headers=one).status_code == 403
+        assert client.post("/one/ui/logout", headers=one).status_code == 200
+        assert client.get("/two/ui/api/session").status_code == 200
+        assert client.post("/two/ui/logout", headers=two).status_code == 200
 
 
 def test_ui_is_opt_in_and_credentials_fail_closed(app, monkeypatch):
