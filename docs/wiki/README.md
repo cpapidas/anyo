@@ -9,6 +9,7 @@ Pick what you want to do. Each guide gives you a short example and links to more
 | Try Anyo for the first time | [Quick start](../../README.md#try-it) |
 | Run code when a pull request opens | [GitHub hooks](github-hooks.md) |
 | Handle Slack events and commands | [Slack hooks](slack-hooks.md) |
+| Run code when Notion content changes | [Notion hooks](notion-hooks.md) |
 | Start a pipeline from an incident or error | [Better Stack hooks](betterstack-hooks.md) |
 | Check out a commit and reuse Git data | [Repository workspaces](repository-workspaces.md) |
 | Share a cache or seed a new host | [Repository deployment](repository-deployment.md) |

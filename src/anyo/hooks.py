@@ -15,6 +15,7 @@ __all__ = [
     "Provider",
     "Responder",
     "ResponseProvider",
+    "ResponderCapability",
     "RetryPolicy",
     "EventCodec",
     "WebhookDelivery",
@@ -197,8 +198,18 @@ class ResponseProvider(Provider, Protocol):
 
     ``request_timeout`` bounds the entire receive/response operation. Old
     providers continue returning HookEvent/None and need no new members.
+    Providers that only need a deadline/acknowledgment may implement
+    ``ResponderCapability`` with ``supports_responders=False`` to reject
+    consumer responders during registration.
     """
 
     request_timeout: float
 
     def decode(self, body: bytes, headers: Mapping[str, str], secret: str) -> WebhookDelivery: ...
+
+
+@runtime_checkable
+class ResponderCapability(Protocol):
+    """Optional response-provider opt-out; absence preserves responder support."""
+
+    supports_responders: bool

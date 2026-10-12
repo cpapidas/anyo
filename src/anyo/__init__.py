@@ -12,6 +12,7 @@ from anyo.application import Application
 from anyo.hooks import Hook, HookEvent, HookResponse, RetryPolicy
 from anyo.integrations.betterstack import BetterStackProvider
 from anyo.integrations.github import GitHubProvider
+from anyo.integrations.notion import NotionProvider
 from anyo.integrations.omo import omo_harness
 from anyo.integrations.opencode import opencode_harness
 from anyo.integrations.redis import RedisQueue
@@ -37,7 +38,7 @@ __all__ = [
 
 # This composition root selects built-in adapters; construction is inert.
 _application = Application(
-    providers=[GitHubProvider(), SlackProvider(), BetterStackProvider()],
+    providers=[GitHubProvider(), SlackProvider(), BetterStackProvider(), NotionProvider()],
     harnesses={"opencode": opencode_harness, "omo": omo_harness},
     queue_backends={"sqlite": SqliteQueue, "redis": RedisQueue, "rediss": RedisQueue},
     queue_url="sqlite:///.anyo/queue.sqlite3",
