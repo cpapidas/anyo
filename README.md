@@ -14,7 +14,7 @@ With Anyo, you can ask your AI model to build workflows such as:
 
 Anyo handles the integrations and job execution, so your jobs stay clean and easy to read.
 
-We support GitHub, Slack, and Better Stack today. We plan to add more tools soon.
+We support GitHub, Slack, Better Stack, and Notion today. We plan to add more tools soon.
 
 ## Example: build a PR reviewer
 
@@ -76,7 +76,7 @@ Anyo listens on `127.0.0.1:8000` and saves jobs in `.anyo/queue.sqlite3`. Everyt
 
 ## How-to guides
 
-- [Connect GitHub](docs/wiki/github-hooks.md), [Slack](docs/wiki/slack-hooks.md), or [Better Stack](docs/wiki/betterstack-hooks.md).
+- [Connect GitHub](docs/wiki/github-hooks.md), [Slack](docs/wiki/slack-hooks.md), [Better Stack](docs/wiki/betterstack-hooks.md), or [Notion](docs/wiki/notion-hooks.md).
 - [Run an AI prompt](docs/wiki/run-prompts.md) or [prepare repository files](docs/wiki/repository-workspaces.md).
 - [Choose SQLite or Redis](docs/wiki/workers.md) or [run separate workers](docs/wiki/separate-workers.md).
 - [Open the dashboard](docs/wiki/operations-ui.md).

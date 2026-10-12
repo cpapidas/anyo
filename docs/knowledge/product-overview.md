@@ -5,7 +5,7 @@
 A developer wants to respond to a GitHub event, run their own code, ask agents to analyze what happened, and use the results in later steps. Anyo is intended to make workflows like this programmable while allowing prompts to improve through feedback on their outcomes. This document captures the agreed direction and separates it from implementation ideas that still need design.
 
 Status: draft  
-Last updated: 2026-10-11
+Last updated: 2026-10-12
 Scope: Anyo product direction and initial workspace decisions.
 
 ## Confirmed direction
@@ -19,6 +19,7 @@ Scope: Anyo product direction and initial workspace decisions.
 - Give each hook provider a dedicated package under `src/anyo/integrations/<provider>/`, starting with `github/`. Each package owns provider-specific configuration and event handling behind the shared `Provider` interface. The [provider organization task](../tasks/provider-packages/plan.md) preserves the public API while establishing this pattern.
 - Add comprehensive Slack hook support after GitHub, covering actions exposed through Slack app webhooks. The [Slack hooks task](../tasks/slack-hooks/plan.md) implements native events and subtypes, commands, and interactions with immediate response data. The [setup guide](slack-hooks.md) records its API and the [inventory](../tasks/slack-hooks/coverage.md) distinguishes implemented reception from conditional subscriptions and unavailable surfaces.
 - Add Better Stack hooks so an incident or application error can start an Anyo pipeline. The [Better Stack task](../tasks/betterstack-hooks/plan.md) implements direct incident/error webhooks with typed events and existing durable workers. The [contract](betterstack-hooks.md) records authentication and payload-identity limits; [research](../tasks/betterstack-hooks/research.md) distinguishes local verification from live platform gaps and describes log alerts routed through incidents.
+- Add Notion hooks so native Notion events can start Anyo pipelines. The user confirmed webhook triggers as the scope, then authorized implementation. The [Notion contract](notion-hooks.md) describes the separate token collector, signed reception, exact source/entity filters, and durable worker transport. The [task](../tasks/notion-hooks/plan.md) records implementation and verification; [research](../tasks/notion-hooks/research.md) preserves live platform gaps. Outbound content operations are outside this task.
 - Include user-provided scripts as a desired framework capability.
 - Add Python invocation of OpenCode using user prompt files, a library-owned JSON success/failure envelope, and optional live progress. Install OpenCode alongside Anyo in the consumer container and let Python start it locally, without Docker-in-Docker. The [OpenCode task](../tasks/opencode-prompt-execution/plan.md) records the delivered implementation and verification; the [API guide](opencode-prompts.md) describes the current contract. The later worker/queue system is explicitly outside its scope.
 - Configure OpenCode in Python through `anyo.harness(provider="opencode", plugins=[...], models=[{"model": "...", "key": "..."}])`. Anyo translates the registered configuration for its owned runtime; consumers need not manually write OpenCode configuration. Writing and verifying the Dockerfile is an explicit deliverable of the OpenCode task.
@@ -67,7 +68,7 @@ These are design suggestions from the discussion, not accepted implementation co
 - Broader agent orchestration beyond the implemented [OpenCode](opencode-prompts.md) and [native OmO](omo-prompts.md) invocation contracts.
 - Script execution contract and how runtime environments are prepared.
 - Outcome metrics, feedback collection, optimization strategy, and promotion policy.
-- Broader worker orchestration beyond the [SQLite and Redis contract](worker-queues.md), automatic remote webhook provisioning, and future integrations beyond the implemented GitHub, Slack, and Better Stack providers.
+- Broader worker orchestration beyond the [SQLite and Redis contract](worker-queues.md), automatic remote webhook provisioning, and future integrations beyond the implemented GitHub, Slack, Better Stack, and Notion providers.
 - License, package-index name availability, versioning policy, and release destination. The current `anyo` distribution is local development version `0.1.0.dev0`; no publication is implied.
 
 ## Sources
@@ -94,3 +95,6 @@ These are design suggestions from the discussion, not accepted implementation co
 - Project follow-up, 2026-10-11 (no share link supplied): authorized implementation of the repository workspace task.
 - Project conversation, 2026-10-11 (no share link supplied): requested research and task creation for Better Stack incident/error hooks that start an Anyo process; requested autonomous work without delegation or clarification. The initial [task](../tasks/betterstack-hooks/plan.md) recorded planning before the implementation follow-up below.
 - Project follow-up, 2026-10-11 (no share link supplied): authorized implementation and testing of the Better Stack task, working alone without clarification. Its [contract](betterstack-hooks.md) records the delivered behavior and verification limits.
+- Project conversation, 2026-10-11 (no share link supplied): requested project context from docs and a task design for Notion integration; selected Notion events that trigger Anyo pipelines. The [Notion task](../tasks/notion-hooks/plan.md) records planning only.
+
+- Project follow-up, 2026-10-12 (no share link supplied): authorized implementation of the Notion task, a new branch, and a pull request, working alone. The [contract](notion-hooks.md) records implemented behavior and the [task](../tasks/notion-hooks/plan.md) records verification.

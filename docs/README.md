@@ -13,6 +13,7 @@ Start with the [wiki](wiki/README.md) for short how-to guides and examples. This
 
 ## Knowledge index
 
+- [Notion hooks](knowledge/notion-hooks.md) — `accepted`; token collection, signed native events, exact source/entity filters, durable identity, and worker transport; live platform delivery remains unverified.
 - [Better Stack hooks](knowledge/betterstack-hooks.md) — `accepted`; incident/error registration, authentication, native context, durable identity, and verified limits.
 - [Repository workspaces](knowledge/repository-workspaces.md) — `accepted`; exact commits, persistent caches, sync/async ownership, credentials, cleanup, and bundle seeds.
 
@@ -27,6 +28,7 @@ Start with the [wiki](wiki/README.md) for short how-to guides and examples. This
 
 ## Task index
 
+- [Start pipelines from Notion events](tasks/notion-hooks/plan.md) — `done`; signed webhooks, setup-only token collection, native event filters, and durable transport; 858 installed-wheel tests plus two real Redis worker checks passed. [Research and platform limits](tasks/notion-hooks/research.md).
 - [Start pipelines from Better Stack incidents and errors](tasks/betterstack-hooks/plan.md) — `done`; authenticated incident/error hooks, typed events, SQLite/Redis workers, and setup example; 721 tests passed against the installed wheel plus two real Redis worker checks. [Research and platform limits](tasks/betterstack-hooks/research.md).
 - [Clone repositories and reuse cached Git data across workers](tasks/repository-workspaces/plan.md) — `done`; exact-commit workspaces, persistent caches, cleanup, bundle seeds, and runnable project/worker examples; verified installed wheel, SQLite/Redis workers, and container replacement.
 - [Build a protected operations UI](tasks/protected-operations-ui/plan.md) — `done`; environment-configured login, Runs and retry, process-based run/worker controls, and unified logs; verified browser flows, real Redis, and 581 tests against the clean installed wheel.

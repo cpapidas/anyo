@@ -2,7 +2,7 @@
 
 ## For Humans
 
-A pipeline needs both an event and the files it will work on. These examples fetch repositories into cached workspaces, run jobs from GitHub, Slack, or Better Stack, and expose the protected operations UI. The worker examples support SQLite or Redis and separate receiver/worker processes.
+A pipeline needs both an event and the files it will work on. These examples fetch repositories into cached workspaces, run jobs from GitHub, Slack, Better Stack, or Notion, and expose the protected operations UI. The worker examples support SQLite or Redis and separate receiver/worker processes.
 
 ## Repository workspaces
 
@@ -49,6 +49,10 @@ Set `ANYO_ROLE=receiver` and `ANYO_ROLE=worker` in separate terminals to split e
 ## Better Stack example
 
 [betterstack_webhook.py](betterstack_webhook.py) starts a local callback for incidents and new errors. [Connect Better Stack](../docs/wiki/betterstack-hooks.md) covers the shared-secret header, outgoing webhook setup, application filtering, a local test delivery, and separate SQLite/Redis workers. No Better Stack API token or model call is required. Some incident templates omit event names, so select desired incident changes in Better Stack; the example accepts every notification from that integration.
+
+## Notion example
+
+[notion_webhook.py](notion_webhook.py) receives native events and prints their type and entity ID. [Connect Notion](../docs/wiki/notion-hooks.md) explains the separate verification-token collector, manual confirmation, signature validation, source filters, and SQLite/Redis workers. Only use a confirmed verification token with the normal receiver; no Notion SDK or REST access token is needed.
 
 ## Run the GitHub example
 
@@ -140,7 +144,7 @@ An empty application cannot start. Starting inside a running event loop is also 
 
 ## Isolated applications and ASGI hosting
 
-The module-level API uses a default application with GitHub and Slack configured. Use an isolated `Application` to own a separate registry or supply provider adapters explicitly:
+The module-level API uses a default application with GitHub, Slack, Better Stack, and Notion configured. Use an isolated `Application` to own a separate registry or supply provider adapters explicitly:
 
 ```python
 from anyo import HookEvent

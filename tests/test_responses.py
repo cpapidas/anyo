@@ -182,6 +182,39 @@ def test_a_consumer_provider_can_return_a_challenge_and_immediate_response():
     assert calls == ["reply", "pipeline"]
 
 
+@pytest.mark.parametrize("supported", [False, True])
+def test_consumer_provider_can_explicitly_control_responder_registration(supported):
+    class ConfiguredProvider(ReplyProvider):
+        supports_responders = supported
+
+    app = Application(providers=[ConfiguredProvider()])
+
+    async def answer(value):
+        return HookResponse()
+
+    options = dict(provider="example", action="ready", secret="test", responder=answer)
+    if supported:
+        app.add_hook(**options)
+        with TestClient(app.asgi()) as client:
+            assert client.post("/webhooks/example", content=b"event").content == b"ok"
+    else:
+        with pytest.raises(ValueError, match="does not support immediate responders"):
+            app.add_hook(**options)
+        # Opting out of responders preserves provider-owned acknowledgment support.
+        app.add_hook(provider="example", action="ready", secret="test", pipeline=lambda e: None)
+        with TestClient(app.asgi()) as client:
+            assert client.post("/webhooks/example", content=b"challenge").content == b"answer"
+
+
+@pytest.mark.parametrize("value", [None, 0, "false"])
+def test_responder_capability_is_explicitly_boolean(value):
+    class InvalidProvider(ReplyProvider):
+        supports_responders = value
+
+    with pytest.raises(TypeError, match="supports_responders must be a boolean"):
+        Application(providers=[InvalidProvider()])
+
+
 def test_expired_synchronous_matching_does_not_start_consumer_work(monkeypatch):
     class SlowMatchingProvider(ReplyProvider):
         def matches(self, configuration, value):

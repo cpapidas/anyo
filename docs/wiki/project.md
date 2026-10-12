@@ -6,7 +6,7 @@ Anyo is a Python library for AI pipelines written in code. This page separates w
 
 ## Available now
 
-- GitHub, Slack, and Better Stack webhooks that call your Python functions.
+- GitHub, Slack, Better Stack, and [Notion](notion-hooks.md) webhooks that call your Python functions.
 - OpenCode and native OmO prompt execution with structured results and progress.
 - Repository checkouts at exact commits, with cached Git data shared across workers.
 - SQLite or Redis queues, with optional separate workers.

@@ -44,6 +44,7 @@ from anyo.hooks import (
     Pipeline,
     Provider,
     Responder,
+    ResponderCapability,
     ResponseProvider,
     RetryPolicy,
     WebhookDelivery,
@@ -176,6 +177,11 @@ class Application:
                     or deadline <= 0
                 ):
                     raise ValueError("Provider request_timeout must be finite and positive")
+            if (
+                isinstance(provider, ResponderCapability)
+                and type(provider.supports_responders) is not bool
+            ):
+                raise TypeError("Provider supports_responders must be a boolean")
             self._providers[provider.name] = provider
         self._codecs = EventCodecRegistry(
             [
@@ -267,7 +273,10 @@ class Application:
                 except (TypeError, ValueError):
                     raise TypeError(f"{label} must accept one positional event argument") from None
             if responder is not None:
-                if not isinstance(self._providers[provider], ResponseProvider):
+                adapter = self._providers[provider]
+                if not isinstance(adapter, ResponseProvider) or (
+                    isinstance(adapter, ResponderCapability) and not adapter.supports_responders
+                ):
                     raise ValueError("Provider does not support immediate responders")
                 if not (
                     inspect.iscoroutinefunction(responder)
