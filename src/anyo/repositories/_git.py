@@ -137,6 +137,23 @@ def storage_error(error: OSError) -> RepositoryError:
     )
 
 
+def _kill_group(pid: int) -> None:
+    deadline = time.monotonic() + 1.0
+    while True:
+        try:
+            os.killpg(pid, signal.SIGKILL)
+            return
+        except ProcessLookupError:
+            return
+        except PermissionError as error:
+            # Darwin reports EPERM for a group containing only unreaped zombies.
+            # Give the reaper a bounded chance to remove it; preserve real denials.
+            delay = min(0.01, deadline - time.monotonic())
+            if sys.platform != "darwin" or error.errno != errno.EPERM or delay <= 0:
+                raise
+            time.sleep(delay)
+
+
 class Git:
     def __init__(
         self,
@@ -290,10 +307,7 @@ class Git:
                 except subprocess.TimeoutExpired:
                     pass
         finally:
-            try:
-                os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
+            _kill_group(process.pid)
             process.wait()
             for reader in readers:
                 if reader.ident is not None:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import errno
 import hashlib
 import json
 import os
@@ -14,12 +15,14 @@ import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from anyo.agents import Harness, Model, PromptClient, PromptResult, PromptSuccess
 from anyo.observability import process_scope
 from anyo.repositories import HTTPSCredentials, RepositoryCache, RepositoryError, SSHCredentials
+from anyo.repositories import _git as git_runtime
 
 
 def git(path, *args):
@@ -176,6 +179,78 @@ def test_missing_pr_ref_can_fetch_exact_commit(cache, origin):
     sha = git(origin, "rev-parse", "HEAD")
     with cache.checkout(local_path=origin, commit=sha, fetch_ref="refs/pull/999/head") as checkout:
         assert checkout.commit_sha == sha
+
+
+def test_missing_pr_ref_survives_darwin_zombie_group_cleanup(cache, origin, monkeypatch):
+    sha = git(origin, "rev-parse", "HEAD")
+    spawn = subprocess.Popen
+    kill_group = os.killpg
+    affected = {}
+    denied = []
+    delays = []
+
+    def track_missing_ref(command, **kwargs):
+        process = spawn(command, **kwargs)
+        if any("refs/pull/999/head" in argument for argument in command):
+            affected[process.pid] = process
+        return process
+
+    def transient_denial(pid, signum):
+        if pid in affected:
+            assert affected.pop(pid).returncode is not None
+            denied.append(pid)
+            raise PermissionError(errno.EPERM, "Unreaped process group")
+        kill_group(pid, signum)
+
+    monkeypatch.setattr(sys, "platform", "darwin")
+    monkeypatch.setattr(git_runtime.subprocess, "Popen", track_missing_ref)
+    monkeypatch.setattr(git_runtime.os, "killpg", transient_denial)
+    monkeypatch.setattr(
+        git_runtime,
+        "time",
+        SimpleNamespace(monotonic=git_runtime.time.monotonic, sleep=delays.append),
+    )
+    with cache.checkout(local_path=origin, commit=sha, fetch_ref="refs/pull/999/head") as checkout:
+        assert checkout.commit_sha == sha
+        assert (checkout.path / "source.txt").read_text() == "one\n"
+    assert len(denied) == 1
+    assert delays and all(0 < delay <= 0.01 for delay in delays)
+
+
+@pytest.mark.parametrize(
+    ("platform", "error_number", "elapsed"),
+    [
+        ("darwin", errno.EPERM, 1.0),
+        ("linux", errno.EPERM, 0.0),
+        ("darwin", errno.EACCES, 0.0),
+        ("darwin", errno.EIO, 0.0),
+    ],
+)
+def test_git_group_cleanup_preserves_persistent_errors(
+    monkeypatch, platform, error_number, elapsed
+):
+    clock = [0.0]
+    delays = []
+    failure = OSError(error_number, "Cannot signal group")
+
+    def advance(delay):
+        assert 0 < delay <= 0.01
+        delays.append(delay)
+        clock[0] += delay
+
+    def deny(pid, signum):
+        raise failure
+
+    monkeypatch.setattr(sys, "platform", platform)
+    monkeypatch.setattr(git_runtime.os, "killpg", deny)
+    monkeypatch.setattr(
+        git_runtime, "time", SimpleNamespace(monotonic=lambda: clock[0], sleep=advance)
+    )
+    with pytest.raises(OSError) as caught:
+        git_runtime._kill_group(123)
+    assert caught.value is failure
+    assert clock[0] == pytest.approx(elapsed)
+    assert bool(delays) is bool(elapsed)
 
 
 def test_separate_scopes_do_not_reuse_private_data(cache, origin, tmp_path):
