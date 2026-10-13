@@ -10,7 +10,7 @@ Scope: licensing, metadata, automatic alpha versioning, installed-artifact verif
 
 ## Release decisions
 
-- The user requested autonomous publication on 2026-10-12, then selected the MIT license and automatic alpha publication on 2026-10-13.
+- The user requested autonomous publication on 2026-10-12, then selected the MIT license and requested automatic publication on 2026-10-13. Retain the prepared alpha release line for this automation.
 - Retain distribution/import name `anyo`, setuptools, Python 3.12+, and the existing base dependencies and extras. Include the completed HTTP embedding work already merged into `main`.
 - Trigger `.github/workflows/release.yml` on pushes to the actual default branch, `main`, including merged PRs. Publish only after the release checks pass.
 - Use alpha series `0.1.0`, with `0.1.0aN` assigned from `github.run_number`. The workflow's `v0.1.0aN` tag on the triggering commit is authoritative; `setuptools-scm` resolves the dynamic package version. Do not create version-bump commits or require manual release dispatch.
@@ -28,8 +28,8 @@ The earlier GitHub workflow-upload block is resolved through the repository's wo
 
 - [x] The owner has selected MIT, and the versioning and publication policy are recorded.
 - [x] Installation instructions distinguish pending publication, source/wheel installation, published version pins, optional extras, and external executables.
-- [ ] Fresh source-to-wheel artifacts contain MIT license metadata/text, runtime resources, and typing metadata, with the expected tag-derived version.
-- [ ] Current release scripts and workflow definitions pass their applicable checks, including rerun/version/artifact behavior.
+- [x] Fresh source-to-wheel artifacts contain MIT license metadata/text, runtime resources, and typing metadata, with the expected tag-derived version.
+- [x] Current release scripts and workflow definitions pass their applicable checks, including rerun/version/artifact behavior.
 - [ ] CI verifies installed artifacts on Linux/macOS and Python 3.12–3.15.
 - [ ] The release PR is merged and the pending PyPI Trusted Publisher is configured.
 - [ ] PyPI accepts the exact checked wheel and source archive under the intended account and version.
@@ -37,7 +37,18 @@ The earlier GitHub workflow-upload block is resolved through the repository's wo
 
 ## Current verification and outcome
 
-The MIT and automatic-release changes require fresh verification. Record their exact checks, environments, artifact versions, and GitHub run results here. Earlier candidate results below do not establish that the changed release setup has passed. Publication remains unverified until the exact artifacts are accepted by PyPI and a clean public-index installation succeeds.
+The implementation is in [PR #4](https://github.com/cpapidas/anyo/pull/4). On 2026-10-13:
+
+- An isolated build from a temporary Git clone tagged locally as `v0.1.0a1` produced a source archive and then a wheel from that archive. The verification tag was not pushed. Both artifacts passed strict Twine checks and the release metadata/resource guard, including matching MIT license text.
+- All 64 wheel runtime/resource files matched source. The source archive included release scripts and tests; archive inspection found no local environment, credential, cache, or Git directories.
+- A fresh base-only installation passed the resource and ASGI/SQLite lifecycle smoke from outside the checkout with `python -I`. Dependency checks passed before and after extras/test tooling were installed.
+- **917 tests passed, with 41 live tests deselected**, against that installed wheel on macOS ARM64/Python 3.12 (48.08 seconds). This includes 39 release tests covering immutable version tags, full and partial upload retries, metadata validation, and conflicting remote hashes.
+- Ruff lint and formatting passed. Mypy passed for 57 library modules and, separately, the three release scripts. The Docker `wheel` target built successfully without Git metadata using development version `0.0.dev0` and included the license.
+- Actionlint 1.7.12 passed with only its unsupported `concurrency.queue` diagnostic excluded. `queue: max` is documented by GitHub; the installed validator predates support for that key.
+- [GitHub verification](https://github.com/cpapidas/anyo/actions/runs/38345545322) has passed build and lint; its eight installed-package matrix jobs are still running at this update.
+- Ten changed documentation openings and 151 local links/anchors passed inspection.
+
+The GitHub `pypi` environment now permits deployments from `main`. Publication remains unverified until the PyPI publisher is configured, the exact artifacts are accepted, and a clean public-index installation succeeds.
 
 ## Earlier candidate verification
 

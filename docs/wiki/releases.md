@@ -36,7 +36,7 @@ The release workflow queues up to 100 pending runs. This is a bounded queue, so 
 
 Run the [development checks](development.md) before merging. The workflows build a source archive and its wheel, check metadata and archive contents, and run installed-package tests on Linux and macOS with Python 3.12–3.15. Each environment first checks a base-only installation without optional clients or test dependencies, then adds extras and runs ordinary tests. Live service/model tests remain opt-in.
 
-The release checks include the MIT license, typing marker, dashboard assets, prompt resources, and absence of unwanted local files. Publishing consumes the checked artifacts rather than building another copy. Alpha APIs and durable storage formats may change; describe migrations and unsupported combinations in the release notes.
+The release checks include the MIT license, typing marker, dashboard assets, and prompt resources. During release preparation, also inspect the archives for unwanted local files. Publishing consumes the checked artifacts rather than building another copy. Alpha APIs and durable storage formats may change; describe migrations and unsupported combinations in the release notes.
 
 ## Recover a failed release
 
