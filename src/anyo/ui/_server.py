@@ -18,7 +18,7 @@ from starlette.responses import JSONResponse, RedirectResponse, Response
 from starlette.routing import Route
 
 from anyo.execution._contracts import CapacityError, QueueMismatch, QueueUnavailable
-from anyo.execution._operations import OperationsBackend
+from anyo.execution._operations import OperationsBackend, logged_tasks
 from anyo.execution._worker import DurableDispatcher
 
 _COOKIE = "anyo_session"
@@ -243,6 +243,8 @@ class Dashboard:
             return JSONResponse({"runs": [asdict(record) for record in records]})
         if resource == "workers":
             return JSONResponse({"workers": [asdict(item) for item in await backend.workers()]})
+        if resource == "log-tasks":
+            return JSONResponse({"tasks": [asdict(item) for item in await logged_tasks(backend)]})
         if resource == "logs":
             after = int(request.query_params.get("after", "0"))
             if after < 0:

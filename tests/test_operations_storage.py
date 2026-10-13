@@ -13,7 +13,7 @@ from uuid import uuid4
 import pytest
 
 from anyo.execution._contracts import Job, QueueSettings
-from anyo.execution._operations import LogEntry, OperationsSettings, WorkerInfo
+from anyo.execution._operations import LogEntry, OperationsSettings, WorkerInfo, logged_tasks
 from anyo.integrations.redis import RedisQueue
 from anyo.integrations.sqlite import SqliteQueue
 
@@ -38,9 +38,9 @@ def backend(request, tmp_path):
 
 
 @asynccontextmanager
-async def queues(backend, *, settings=None):
+async def queues(backend, *, settings=None, namespace=None):
     factory, endpoint = backend
-    namespace = "operations-test-" + uuid4().hex
+    namespace = namespace or "operations-test-" + uuid4().hex
     first = factory(endpoint, namespace, QueueSettings())
     second = factory(endpoint, namespace, QueueSettings())
     other = factory(endpoint, namespace + "-other", QueueSettings())
@@ -267,7 +267,8 @@ def test_logs_are_bounded_filtered_ordered_and_report_retention_gaps(backend):
 def test_logs_and_worker_retention_expire_without_new_writes(backend):
     async def scenario():
         async with queues(backend) as (receiver, worker, _):
-            await worker.append_logs([LogEntry("retained")])
+            await worker.append_logs([LogEntry("retained", run_id="expired")])
+            assert len(await receiver.logged_tasks()) == 1
             await worker.worker_heartbeat(WorkerInfo("old"))
             if isinstance(receiver, SqliteQueue):
                 with sqlite3.connect(receiver._path) as db:
@@ -276,10 +277,85 @@ def test_logs_and_worker_retention_expire_without_new_writes(backend):
             else:
                 await receiver._execute("ZADD", receiver._operations_keys[10], 0, "1")
                 await receiver._execute("ZADD", receiver._operations_keys[7], 0, "old")
+            assert await receiver.logged_tasks() == []
             page = await receiver.logs()
             assert page.entries == [] and page.gap and page.next_cursor == 1
             assert page.oldest_cursor is None
             assert await receiver.workers() == []
+
+    run(scenario())
+
+
+def test_logged_tasks_survive_job_expiry_and_follow_log_retention(backend):
+    async def scenario():
+        namespace = "task-logs-" + uuid4().hex
+        async with queues(
+            backend, settings=OperationsSettings(log_max_entries=4), namespace=namespace
+        ) as (
+            receiver,
+            worker,
+            other,
+        ):
+            assert await receiver.logged_tasks() == []
+            await receiver.admit([job("one")])
+            await worker.append_logs(
+                [
+                    LogEntry("first attempt", run_id="one", attempt=1, timestamp=20),
+                    LogEntry("other task", run_id="two", timestamp=30),
+                    LogEntry("second attempt", run_id="one", attempt=2, timestamp=10),
+                    LogEntry("general"),
+                ]
+            )
+            tasks = await receiver.logged_tasks()
+            assert [(task.run_id, task.entry_count) for task in tasks] == [("one", 2), ("two", 1)]
+            assert tasks[0].hook_id == "hook"
+            assert tasks[0].last_timestamp == 10  # Capture order, even with clock skew.
+            assert await other.logged_tasks() == []
+            assert await receiver.cancel("one")
+            if isinstance(receiver, SqliteQueue):
+                with sqlite3.connect(receiver._path) as db:
+                    db.execute("UPDATE anyo_jobs SET finished_at=0 WHERE id='one'")
+            else:
+                await receiver._execute("ZADD", receiver._keys[4], 0, "one")
+            assert await receiver.inspect() == []
+            assert (await receiver.logged_tasks())[0].hook_id == "hook"
+            entries = (await receiver.logs(run_id="one")).entries
+            assert [entry.attempt for entry in entries] == [1, 2]
+            factory, endpoint = backend
+            reopened = factory(endpoint, namespace, QueueSettings())
+            reopened.configure_operations(OperationsSettings(log_max_entries=4))
+            try:
+                await reopened.open({"hook": "fingerprint"})
+                assert (await reopened.logged_tasks())[0].entry_count == 2
+            finally:
+                await reopened.close()
+            await worker.append_logs([LogEntry("new output", run_id="three")])
+            assert [(t.run_id, t.entry_count) for t in await receiver.logged_tasks()] == [
+                ("three", 1),
+                ("one", 1),
+                ("two", 1),
+            ]
+            await worker.append_logs([LogEntry("general") for _ in range(4)])
+            assert await receiver.logged_tasks() == []
+
+    run(scenario())
+
+
+def test_logged_task_index_falls_back_to_older_operations_backends(backend):
+    async def scenario():
+        async with queues(backend, settings=OperationsSettings(log_max_entries=2000)) as (
+            receiver,
+            worker,
+            _,
+        ):
+            # Consumer adapters do not need the optional compact-index method.
+            class OlderBackend:
+                async def logs(self, **kwargs):
+                    return await receiver.logs(**kwargs)
+
+            await worker.append_logs([LogEntry("output", run_id="one") for _ in range(1000)])
+            await worker.append_logs([LogEntry("later", run_id="two")])
+            assert await logged_tasks(OlderBackend()) == await receiver.logged_tasks()
 
     run(scenario())
 
