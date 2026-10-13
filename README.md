@@ -30,15 +30,15 @@ Your job supplies the PR changes and review prompt. Anyo handles the webhook, qu
 
 ## Try it
 
-Use Python 3.12 or later. From this checkout:
+Use Python 3.12 or later. In your Python project, create a virtual environment and install Anyo from PyPI:
 
 ```sh
 python3.12 -m venv .venv
 source .venv/bin/activate
-python -m pip install .
+python -m pip install 'anyo==0.1.0a2'
 ```
 
-Anyo uses the [MIT license](https://github.com/cpapidas/anyo/blob/main/LICENSE). Automatic alpha releases are active; the first PyPI publication is pending successful release checks. Install from source until publication is confirmed. See [installation and requirements.txt](https://github.com/cpapidas/anyo/blob/main/docs/wiki/installation.md) for wheels, version pinning, and optional dependencies.
+Anyo uses the [MIT license](https://github.com/cpapidas/anyo/blob/main/LICENSE). Version [0.1.0a2 is available on PyPI](https://pypi.org/project/anyo/0.1.0a2/); you do not need to clone this repository. See [installation and requirements.txt](https://github.com/cpapidas/anyo/blob/main/docs/wiki/installation.md) for version pinning and optional dependencies.
 
 Save this as `main.py`. Replace `your-org` and `your-repo` with your repository owner and name:
 

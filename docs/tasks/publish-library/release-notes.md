@@ -1,8 +1,8 @@
-# Anyo 0.1.0 alpha release notes
+# Anyo 0.1.0a2 release notes
 
 ## For Humans
 
-The first published alpha will package Anyo's event-driven AI pipeline capabilities for Python applications under the MIT license. These notes describe the initial release scope; publication is still pending. The exact `0.1.0aN` version is assigned by the [automatic release workflow](../../wiki/releases.md#how-versions-are-assigned).
+Anyo [0.1.0a2](https://pypi.org/project/anyo/0.1.0a2/) is the first published alpha of its event-driven AI pipeline library, under the MIT license. The [automatic release workflow](../../wiki/releases.md#how-versions-are-assigned) assigns a new alpha version to each release run.
 
 ## Included capabilities
 
@@ -15,7 +15,7 @@ The first published alpha will package Anyo's event-driven AI pipeline capabilit
 
 ## Installation and compatibility
 
-Python 3.12 or later is required. Base installation includes the HTTP server and SQLite support; optional requirements are `anyo[redis]` and `anyo[opencode]`. See [installation](../../wiki/installation.md) for executable prerequisites and the first publication's status.
+Python 3.12 or later is required. Base installation includes the HTTP server and SQLite support; optional requirements are `anyo[redis]` and `anyo[opencode]`. Install with `python -m pip install 'anyo==0.1.0a2'`. See [installation](../../wiki/installation.md) for executable prerequisites and optional dependencies.
 
 This is an alpha. Public APIs and durable storage formats may change; pin versions and upgrade processes sharing a queue together. Repository workspaces, native managed OmO, and process execution require Linux or macOS/POSIX support. External model executables are not included in the Python wheel.
 
@@ -25,4 +25,4 @@ Webhook reception is covered by deterministic fixtures. Live Better Stack and No
 
 ## Verification
 
-The [release task](plan.md) records exact checks, environments, access blockers, and eventual publication results.
+The [release task](plan.md) records the initial `0.1.0a1` check failure, the macOS cleanup fix in PR #5, and the successful `0.1.0a2` publication and installation checks.

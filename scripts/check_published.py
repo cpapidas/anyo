@@ -5,11 +5,13 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
 import sys
 import tarfile
+import time
 import zipfile
 from email.parser import BytesParser
 from pathlib import Path
@@ -143,15 +145,31 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("distdir", type=Path)
     parser.add_argument("--upload-dir", type=Path, default=Path("upload"))
     parser.add_argument("--verify", action="store_true")
+    parser.add_argument(
+        "--wait-seconds",
+        type=float,
+        help="Wait for missing PyPI files when verifying (default: 0; requires --verify)",
+    )
     args = parser.parse_args(argv)
+    if args.wait_seconds is not None:
+        if not args.verify:
+            parser.error("--wait-seconds requires --verify")
+        if not math.isfinite(args.wait_seconds) or args.wait_seconds < 0:
+            parser.error("--wait-seconds must be a finite nonnegative number")
     try:
         local = distribution_files(args.version, args.distdir)
-        missing = missing_files(local, published_hashes(args.version))
-        if args.verify:
-            if missing:
+        deadline = time.monotonic() + (args.wait_seconds or 0.0)
+        while True:
+            missing = missing_files(local, published_hashes(args.version))
+            if not args.verify or not missing:
+                break
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
                 raise ValueError(
                     f"Missing files on PyPI: {', '.join(path.name for path in missing)}"
                 )
+            time.sleep(min(2.0, remaining))
+        if args.verify:
             print(f"Verified both PyPI artifacts for anyo {args.version}")
         else:
             stage_upload(local, missing, args.upload_dir)
