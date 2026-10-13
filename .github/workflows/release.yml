@@ -58,6 +58,7 @@ jobs:
       url: https://pypi.org/project/anyo/${{ needs.prepare.outputs.version }}/
     permissions:
       contents: read
+      actions: read
       id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -72,6 +73,8 @@ jobs:
         with:
           name: python-distributions-${{ github.run_id }}
           path: dist
+          github-token: ${{ github.token }}
+          run-id: ${{ github.run_id }}
       - name: Check existing files and stage only missing distributions
         id: existing
         env:
