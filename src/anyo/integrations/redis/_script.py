@@ -414,7 +414,7 @@ elseif operation == 'get_worker_command' then
     if worker and worker.command and worker.command ~= cjson.null then
         response = {'ok', worker.command}
     end
-elseif operation ~= 'append_logs' and operation ~= 'logs' then
+elseif operation ~= 'append_logs' and operation ~= 'logs' and operation ~= 'logged_tasks' then
     return {'mismatch', 'operation'}
 end
 
@@ -425,6 +425,11 @@ if operation == 'append_logs' then
     for _, entry in ipairs(options.entries) do
         cursor = cursor + 1
         entry.cursor = cursor
+        if entry.run_id and entry.run_id ~= cjson.null
+            and (not entry.hook_id or entry.hook_id == cjson.null) then
+            local job = redis.call('HGET', KEYS[2], entry.run_id)
+            if job then entry.hook_id = cjson.decode(job).job.hook_id end
+        end
         table.insert(additions, {id=tostring(cursor), raw=cjson.encode(entry)})
     end
 end
@@ -434,6 +439,20 @@ for _, id in ipairs(redis.call('ZRANGEBYSCORE', KEYS[11], '-inf',
     cutoff = math.max(cutoff, tonumber(id))
 end
 local removed_logs = redis.call('ZRANGEBYSCORE', KEYS[10], '-inf', cutoff)
+if operation == 'logged_tasks' then
+    local tasks = {}
+    for _, id in ipairs(redis.call('ZRANGEBYSCORE', KEYS[10], '(' .. cutoff, '+inf')) do
+        local entry = cjson.decode(redis.call('HGET', KEYS[9], id))
+        if entry.run_id and entry.run_id ~= cjson.null and entry.run_id ~= '' then
+            local previous = tasks[entry.run_id]
+            tasks[entry.run_id] = {run_id=entry.run_id,
+                entry_count=(previous and previous.entry_count or 0) + 1,
+                last_cursor=entry.cursor, last_timestamp=entry.timestamp,
+                hook_id=entry.hook_id or cjson.null}
+        end
+    end
+    for _, task in pairs(tasks) do table.insert(response, cjson.encode(task)) end
+end
 if operation == 'logs' then
     local entries = {}
     local oldest = redis.call('ZRANGEBYSCORE', KEYS[10], '(' .. cutoff, '+inf', 'LIMIT', 0, 1)

@@ -27,6 +27,7 @@ from anyo.execution._contracts import (
 )
 from anyo.execution._operations import (
     LogEntry,
+    LoggedTask,
     LogPage,
     OperationsSettings,
     RunControl,
@@ -406,6 +407,13 @@ class SqliteQueue:
                 cursor += 1
                 record = asdict(entry)
                 record["cursor"] = cursor
+                if entry.run_id and not entry.hook_id:
+                    job = connection.execute(
+                        "SELECT hook_id FROM anyo_jobs WHERE namespace=? AND id=?",
+                        (self._namespace, entry.run_id),
+                    ).fetchone()
+                    if job:
+                        record["hook_id"] = job["hook_id"]
                 connection.execute(
                     "INSERT INTO anyo_logs VALUES(?,?,?,?,?,?,?,?)",
                     (
@@ -426,6 +434,34 @@ class SqliteQueue:
             self._prune_logs(connection, now)
 
         await self._invoke(append)
+
+    async def logged_tasks(self) -> list[LoggedTask]:
+        def tasks(connection: sqlite3.Connection) -> list[LoggedTask]:
+            self._prune_logs(connection, self._now(connection))
+            rows = connection.execute(
+                "SELECT summary.run_id,summary.entry_count,latest.record FROM "
+                "(SELECT run_id,COUNT(*) AS entry_count,MAX(cursor) AS last_cursor "
+                "FROM anyo_logs WHERE namespace=? AND run_id IS NOT NULL AND run_id!='' "
+                "GROUP BY run_id) AS summary JOIN anyo_logs AS latest "
+                "ON latest.namespace=? AND latest.cursor=summary.last_cursor "
+                "ORDER BY summary.last_cursor DESC",
+                (self._namespace, self._namespace),
+            )
+            result = []
+            for row in rows:
+                entry = LogEntry(**json.loads(row["record"]))
+                result.append(
+                    LoggedTask(
+                        row["run_id"],
+                        row["entry_count"],
+                        entry.cursor,
+                        entry.timestamp,
+                        entry.hook_id,
+                    )
+                )
+            return result
+
+        return await self._invoke(tasks)
 
     async def logs(
         self,
@@ -647,6 +683,9 @@ class SqliteQueue:
         connection.execute(
             "CREATE INDEX IF NOT EXISTS anyo_jobs_eligible "
             "ON anyo_jobs(namespace, status, available_at, sequence)"
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS anyo_logs_run ON anyo_logs(namespace, run_id, cursor)"
         )
         connection.execute(
             "CREATE INDEX IF NOT EXISTS anyo_jobs_history ON anyo_jobs(namespace, finished_at)"

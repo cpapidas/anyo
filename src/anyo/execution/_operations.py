@@ -65,11 +65,52 @@ class LogPage:
     gap: bool = False
 
 
+@dataclass(frozen=True)
+class LoggedTask:
+    """A task with retained output, independent of queue job retention."""
+
+    run_id: str
+    entry_count: int
+    last_cursor: int
+    last_timestamp: float
+    hook_id: str | None = None
+
+
+@runtime_checkable
+class LogTaskBackend(Protocol):
+    """Optional compact index; older operations backends can use log pagination."""
+
+    async def logged_tasks(self) -> list[LoggedTask]: ...
+
+
+async def logged_tasks(backend: OperationsBackend) -> list[LoggedTask]:
+    """Discover retained tasks without requiring a new third-party backend method."""
+    if isinstance(backend, LogTaskBackend):
+        return await backend.logged_tasks()
+    tasks: dict[str, LoggedTask] = {}
+    cursor = 0
+    while True:
+        page = await backend.logs(after=cursor, limit=1000)
+        for entry in page.entries:
+            if entry.run_id:
+                previous = tasks.get(entry.run_id)
+                tasks[entry.run_id] = LoggedTask(
+                    entry.run_id,
+                    (previous.entry_count if previous else 0) + 1,
+                    entry.cursor,
+                    entry.timestamp,
+                    entry.hook_id or (previous.hook_id if previous else None),
+                )
+        if len(page.entries) < 1000 or page.next_cursor <= cursor:
+            return sorted(tasks.values(), key=lambda task: task.last_cursor, reverse=True)
+        cursor = page.next_cursor
+
+
 def bounded_log(entry: LogEntry, settings: OperationsSettings) -> LogEntry:
     """Validate metadata and bound each stored entry after upstream redaction."""
     if not isinstance(entry.message, str):
         raise ValueError("log message must be a string")
-    for name in ("source", "level", "run_id", "worker_id", "prompt_id"):
+    for name in ("source", "level", "run_id", "worker_id", "prompt_id", "hook_id"):
         value = getattr(entry, name)
         if value is not None and (not isinstance(value, str) or len(value) > 512):
             raise ValueError(f"log {name} must be at most 512 characters")

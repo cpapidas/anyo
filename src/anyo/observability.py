@@ -41,7 +41,11 @@ __all__ = [
 
 @dataclass(frozen=True)
 class LogEntry:
-    """Already-redacted diagnostic; storage assigns a namespace-local cursor."""
+    """Already-redacted diagnostic; storage assigns a namespace-local cursor.
+
+    Built-in storage snapshots the known job's hook ID when appending task logs,
+    so its label remains available after the queue job expires.
+    """
 
     message: str
     source: str = "runtime"
@@ -52,6 +56,7 @@ class LogEntry:
     worker_id: str | None = None
     prompt_id: str | None = None
     cursor: int = 0
+    hook_id: str | None = None
 
 
 class LogSink(Protocol):

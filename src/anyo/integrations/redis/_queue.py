@@ -25,6 +25,7 @@ from anyo.execution._contracts import (
 )
 from anyo.execution._operations import (
     LogEntry,
+    LoggedTask,
     LogPage,
     OperationsSettings,
     RunControl,
@@ -467,6 +468,22 @@ class RedisQueue:
             {"entries": [asdict(bounded_log(entry, self._operations)) for entry in entries]},
         )
 
+    async def logged_tasks(self) -> list[LoggedTask]:
+        response = await self._operate("logged_tasks", {})
+        tasks = []
+        for raw in response:
+            task = _record(raw)
+            tasks.append(
+                LoggedTask(
+                    _string(task.get("run_id")),
+                    _integer(task.get("entry_count")),
+                    _integer(task.get("last_cursor")),
+                    _number(task.get("last_timestamp")),
+                    _optional_string(task.get("hook_id")),
+                )
+            )
+        return sorted(tasks, key=lambda task: task.last_cursor, reverse=True)
+
     async def logs(
         self,
         *,
@@ -508,6 +525,7 @@ class RedisQueue:
                     worker_id=_optional_string(entry.get("worker_id")),
                     prompt_id=_optional_string(entry.get("prompt_id")),
                     cursor=_integer(entry.get("cursor")),
+                    hook_id=_optional_string(entry.get("hook_id")),
                 )
             )
         oldest = data.get("oldest_cursor")

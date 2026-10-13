@@ -37,6 +37,20 @@ The dashboard needs SQLite or Redis and is off by default. Use HTTPS when access
 
 To serve the dashboard inside your own application, use `asgi(ui=True)` and follow [HTTP hosting](http-hosting.md). A mount at `/anyo` puts the dashboard at `/anyo/ui/`; its assets, API calls, and session cookie follow that prefix.
 
+## Open a task's logs
+
+1. Select **Logs** in the sidebar. **Logged tasks** lists runs with retained output, newest activity first.
+2. Search by hook name or task ID, then click the task name or **View logs**.
+3. Read its output across attempts. Filter by source or severity, pause **Live updates** to inspect output, or use **Load next entries** to continue through longer history.
+
+Expand **Execution details** for timestamps, ownership, and errors. Available run controls remain beside the task. Browser Back/Forward and refresh preserve the selected task; its URL can be bookmarked.
+
+Tasks remain listed while their logs are retained, even if their queue history has expired. These tasks show **logs retained** and have no execution controls. Older logs without a saved hook name show the task ID.
+
+Use **All activity** for the combined stream, including general application logs. Click a task link beneath an entry to open that task's output. A run with no captured output is still accessible from **Runs**.
+
+The panel shows up to 1,000 entries at a time. Pausing affects the view only; workers keep collecting output. Reopen a task to start again from its earliest retained entries. Expired or uncaptured logs cannot be recovered.
+
 ## Use separate workers
 
 Use the same hooks, queue URL, and namespace in each process. After registration, the receiver uses:

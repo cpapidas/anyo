@@ -5,10 +5,13 @@ import hashlib
 import hmac
 import json
 import logging
+import shutil
+import subprocess
 import time
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import replace
 from html.parser import HTMLParser
+from importlib.resources import files
 from urllib.parse import urljoin
 
 import pytest
@@ -27,6 +30,62 @@ from anyo.observability import LogEntry
 
 SECRET = "ui-webhook-private-secret"
 PASSWORD = "ui-operator-private-password"
+
+
+def test_successful_browser_login_reloads_a_bookmarked_task():
+    """A same-fragment navigation leaves the login HTML in place after authentication."""
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("Node is required to execute the packaged dashboard login regression")
+    script = r"""
+const assert = require('node:assert/strict');
+const vm = require('node:vm');
+const source = require('node:fs').readFileSync(0, 'utf8');
+(async () => {
+  for (const ok of [true, false]) {
+    let submit;
+    let documentRequests = 0;
+    const initial = new URL('https://example.test/anyo/ui/#task=retained&from=logs');
+    const button = {disabled: false};
+    const elements = {
+      'login-form': {
+        addEventListener(name, handler) { submit = handler; },
+        querySelector() { return button; },
+      },
+      username: {value: 'operator'}, password: {value: 'test-only-password'},
+      'login-error': {textContent: ''},
+    };
+    const location = {
+      hash: initial.hash,
+      reload() { documentRequests++; },
+      replace(url) {
+        const next = new URL(url, initial);
+        if (next.pathname !== initial.pathname || !next.hash) documentRequests++;
+        this.hash = next.hash;
+      },
+    };
+    vm.runInNewContext(source, {
+      document: {getElementById: id => elements[id]},
+      window: {location},
+      fetch: async () => ({ok, json: async () => ({error: 'Incorrect credentials'})}),
+    });
+    await submit({preventDefault() {}});
+    assert.equal(documentRequests, ok ? 1 : 0);
+    assert.equal(location.hash, initial.hash);
+    assert.equal(button.disabled, false);
+    assert.equal(elements.password.value, ok ? '' : 'test-only-password');
+    assert.equal(elements['login-error'].textContent, ok ? '' : 'Incorrect credentials');
+  }
+})().catch(error => { console.error(error); process.exitCode = 1; });
+"""
+    subprocess.run(
+        [node, "-e", script],
+        input=files("anyo.ui").joinpath("assets", "ui.js").read_text(),
+        text=True,
+        capture_output=True,
+        check=True,
+        timeout=10,
+    )
 
 
 @pytest.fixture
@@ -130,6 +189,17 @@ def test_dashboard_mount_paths_assets_cookies_and_controls(app, mount, root_path
         assert "runs-view" in client.get(f"{prefix}/ui/").text
         runs = client.get(f"{prefix}/ui/api/runs").json()["runs"]
         assert len(runs) == 1
+        backend = child.state.dispatcher.operations_backend
+        client.portal.call(backend.append_logs, [LogEntry("mounted output", run_id=runs[0]["id"])])
+        tasks = client.get(f"{prefix}/ui/api/log-tasks").json()["tasks"]
+        assert len(tasks) == 1 and tasks[0]["hook_id"] == "review"
+        assert tasks[0]["run_id"] == runs[0]["id"]
+        assert (
+            client.get(f"{prefix}/ui/api/logs?run_id={runs[0]['id']}").json()["entries"][0][
+                "message"
+            ]
+            == "mounted output"
+        )
         action = f"{prefix}/ui/api/runs/{runs[0]['id']}/cancel"
         assert client.post(action).status_code == 403
         assert (
@@ -194,7 +264,7 @@ def test_ui_is_opt_in_and_credentials_fail_closed(app, monkeypatch):
 def test_authentication_assets_logout_and_webhook_independence(app):
     with TestClient(app.asgi(ui=True, role="receiver")) as client:
         assert "login-form" in client.get("/ui/").text
-        for path in ("runs", "workers", "logs", "session"):
+        for path in ("runs", "workers", "logs", "log-tasks", "session"):
             assert client.get(f"/ui/api/{path}").status_code == 401
         assert client.get("/ui/assets/ui.js").status_code == 200
         assert client.get("/ui/assets/private.py").status_code == 404
@@ -332,11 +402,15 @@ def test_log_history_filters_and_namespace(app):
         assert client.get("/ui/api/logs?after=-1").status_code == 400
         assert client.get("/ui/api/logs?after=no").status_code == 400
         assert client.get("/ui/api/session").json()["namespace"] == "test-ui"
+        tasks = client.get("/ui/api/log-tasks").json()["tasks"]
+        assert len(tasks) == 1
+        assert tasks[0]["run_id"] == "run-one" and tasks[0]["entry_count"] == 1
     with TestClient(app.asgi(ui=True, role="receiver", queue_namespace="test-ui")) as client:
         login(client)
         assert (
             client.get("/ui/api/logs?source=pipeline").json()["entries"][0]["run_id"] == "run-one"
         )
+        assert client.get("/ui/api/log-tasks").json()["tasks"] == tasks
 
 
 def test_session_expiry(app, monkeypatch):

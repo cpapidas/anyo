@@ -28,6 +28,7 @@ Start with the [wiki](wiki/README.md) for short how-to guides and examples. This
 
 ## Task index
 
+- [Open logged tasks and inspect their logs](tasks/task-log-navigation/plan.md) — `done`; searchable logged tasks, retained output after queue expiry, live filters and bookmarked task views; 881 installed-wheel tests and 17 real Redis checks passed.
 - [Publish Anyo as a Python library](tasks/publish-library/plan.md) — `done`; MIT-licensed `0.1.0a2` published and verified from PyPI after the macOS cleanup fix; automatic alpha releases remain active on `main`.
 - [Embed Anyo in a host application and extend its HTTP app](tasks/embeddable-http-application/plan.md) — `done`; public app access, external hosting, routes and middleware, composed lifecycle, and mounted dashboard support; 878 installed-wheel tests, real HTTP/Redis checks, and browser verification passed. [Hosting guide](wiki/http-hosting.md).
 - [Start pipelines from Notion events](tasks/notion-hooks/plan.md) — `done`; signed webhooks, setup-only token collection, native event filters, and durable transport; 858 installed-wheel tests plus two real Redis worker checks passed. [Research and platform limits](tasks/notion-hooks/research.md).

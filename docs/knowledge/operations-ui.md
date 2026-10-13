@@ -5,7 +5,7 @@
 An operator needs to see which pipelines are running, read their output, and stop work that has become stuck. Anyo's optional browser UI provides these controls while pipeline definitions remain in Python. This guide explains setup, execution modes, log coverage, and the limits of remote control.
 
 Status: accepted  
-Last updated: 2026-10-12
+Last updated: 2026-10-13
 
 Scope: implemented UI and operations contract; final verification is recorded in the [operations UI task](../tasks/protected-operations-ui/plan.md).
 
@@ -85,7 +85,7 @@ operations = OperationsSettings(
 anyo.start(ui=True, operations=operations, execution_mode="process")
 ```
 
-These defaults retain up to 10,000 log entries for 24 hours, with at most 16 KiB per entry. Completed queue jobs have a separate default retention of one hour through `retention_seconds`; logs can therefore outlive the Runs entry they describe. Set the same operations limits on every process sharing a namespace.
+These defaults retain up to 10,000 log entries for 24 hours, with at most 16 KiB per entry. Completed queue jobs have a separate default retention of one hour through `retention_seconds`; logs can therefore outlive the Runs entry they describe. **Logs → Logged tasks** keeps those tasks discoverable until their output expires. Set the same operations limits on every process sharing a namespace.
 
 ## Separate receiver and workers
 
@@ -118,6 +118,18 @@ Controls do not undo external actions. Confirmed cancellation records `cancelled
 Stopping a worker controls its execution service. In combined mode, the receiver and dashboard remain available, and can accept work for other or subsequently restarted workers. A standalone `anyo.start(role="worker")` exits after its worker stops. No UI action accepts an arbitrary operating-system PID or stops unrelated workers.
 
 The dashboard refreshes active views every two seconds. Logs use cursor polling, and the visible log panel retains up to 1,000 entries. Pausing live updates does not stop server collection; resuming continues from the cursor. Retention loss, capture gaps, and truncation are shown rather than treated as a complete history. An unreachable worker or unavailable backend is reported without claiming a control succeeded.
+
+## Find logged tasks
+
+The Logs view opens a searchable list of tasks with retained output, ordered by their latest stored log cursor. Here a task is one pipeline run; all its retained attempts share the same detail view. Each row shows the saved hook name when known, full run ID, current queue status when available, retained entry count, and timestamp of its latest captured entry. A task whose queue record has expired shows `logs retained`, without inventing a final outcome or offering execution controls.
+
+Click a task name, **View logs**, or a task link in **All activity** to open its output. Source and severity filters apply within the selected run. Attempt, prompt, and worker metadata remain attached to individual entries. History starts at the earliest retained entry, loads 200 entries per request, and can continue with **Load next entries** while live updates are paused. The 1,000-entry browser window is separate from backend retention; reopening the task starts reading retained history again. General records without run IDs remain in All activity. Runs with no captured logs remain accessible through Runs.
+
+Selection lives in the URL fragment, supporting refresh, bookmarks, browser Back/Forward, and mounted applications without adding a new server route. Generation/cursor checks discard responses from an earlier selection or filter. Live updates preserve keyboard focus on task links and execution controls.
+
+The authenticated `log-tasks` API derives summaries from retained output rather than queue history. SQLite groups its indexed run/cursor records; Redis summarizes its bounded retained log set atomically. Neither creates unbounded task history, and both prune on reads as well as writes. New stored log records snapshot the hook ID from a known queue job. Earlier records without that optional field remain readable; if both the saved name and queue record are absent, the UI identifies the task by run ID. No historical name or outcome is reconstructed. Third-party operations adapters can continue using the existing log pagination contract; the compact task-index method is optional.
+
+The [task-log navigation task](../tasks/task-log-navigation/plan.md) records this change and its verification.
 
 ## Choose an execution mode
 
@@ -181,6 +193,8 @@ Changing environment credentials takes effect when the receiver restarts. There 
 
 Operations add SQLite fields/tables and Redis records while retaining the existing queue schema identifier. The new `cancelled` outcome and control metadata are not understood by older workers. Stop and upgrade every receiver and worker sharing a namespace before using the new controls; a rolling mixture with older code is unsupported.
 
+Task-log navigation adds a SQLite run/cursor index and an optional `hook_id` field in stored log JSON; it does not change job retention or queue identity. Existing records are readable without a data backfill. Upgrade the shared namespace together as above: older SQLite log readers do not accept the added JSON field.
+
 Drain active work, inspect uncertain attempts, and stop all participating processes. Back up the database or Redis data using the deployment's normal procedure, deploy the same upgraded application/package everywhere, and restart with matching registrations and operations settings. SQLite adds the required fields when opening the existing local database. If registry fingerprints or shared queue settings change as well, follow the [namespace/backend cutover procedure](worker-queues.md#cut-over-without-changing-pipelines). Keep the old data until inspection confirms the migration; do not run an older worker against records created by the new controls.
 
 ## Sources
@@ -189,3 +203,4 @@ Drain active work, inspect uncertain attempts, and stop all participating proces
 - [Operations UI task](../tasks/protected-operations-ui/plan.md), [worker contract](worker-queues.md), [webhook contract](webhook-triggers.md), [OpenCode guide](opencode-prompts.md), and [native OmO guide](omo-prompts.md).
 - Implemented application, execution, storage, UI, and observability contracts; controlled fixture verification is recorded in the task rather than presented as live model validation.
 - [Embedding task](../tasks/embeddable-http-application/plan.md), authorized on 2026-10-12: mounted path handling, independent app sessions, and browser verification using an installed wheel.
+- Project conversation, 2026-10-13 (no share link supplied): requested clickable logged tasks and their logs, with storage changes authorized. The [task-log navigation task](../tasks/task-log-navigation/plan.md) records the implementation.
