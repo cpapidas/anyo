@@ -38,7 +38,7 @@ source .venv/bin/activate
 python -m pip install .
 ```
 
-Anyo uses the [MIT license](https://github.com/cpapidas/anyo/blob/main/LICENSE). PyPI alpha releases are pending the release PR's merge and publisher setup; install from source until publication is confirmed. See [installation and requirements.txt](https://github.com/cpapidas/anyo/blob/main/docs/wiki/installation.md) for wheels, version pinning, and optional dependencies.
+Anyo uses the [MIT license](https://github.com/cpapidas/anyo/blob/main/LICENSE). Automatic alpha releases are active; the first PyPI publication is pending successful release checks. Install from source until publication is confirmed. See [installation and requirements.txt](https://github.com/cpapidas/anyo/blob/main/docs/wiki/installation.md) for wheels, version pinning, and optional dependencies.
 
 Save this as `main.py`. Replace `your-org` and `your-repo` with your repository owner and name:
 

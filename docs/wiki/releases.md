@@ -4,7 +4,7 @@
 
 Merging into `main` starts an automatic alpha release. GitHub Actions builds and checks the distribution, then publishes the checked wheel and source archive to PyPI. Anyo uses the [MIT license](../../LICENSE).
 
-The workflow files are part of the release PR. Publication is still pending its merge and the PyPI setup below; no package has been uploaded.
+The workflows are active on `main`, and the owner has confirmed the PyPI publisher setup. The first release stopped at a macOS test failure before upload; publication is pending its repair and successful release checks. The [release task](../tasks/publish-library/plan.md) records progress.
 
 ## Set up PyPI once
 
@@ -18,9 +18,9 @@ Sign in to the intended PyPI owner account and open [account publishing](https:/
 | Workflow filename | `release.yml` |
 | Environment | `pypi` |
 
-The repository's `pypi` environment is configured to allow deployments from `main`. The publication job uses that environment and OIDC, so it needs no long-lived PyPI API token. A pending publisher creates the project on its first successful upload; it does not reserve the name. This setup requires access to the owner's PyPI account, which is not available in the current release task. [PyPI's pending publisher guide](https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/).
+The repository's `pypi` environment is configured to allow deployments from `main`. The publication job uses that environment and OIDC, so it needs no long-lived PyPI API token. A pending publisher creates the project on its first successful upload; it does not reserve the name. The owner has confirmed this setup. [PyPI's pending publisher guide](https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/).
 
-GitHub access through the repository's SSH remote works. The earlier workflow-permission issue is resolved; use the actual [check workflow](../../.github/workflows/check.yml) and [release workflow](../../.github/workflows/release.yml) included in the PR.
+GitHub access through the repository's SSH remote works. The earlier workflow-permission issue is resolved; the [check workflow](../../.github/workflows/check.yml) and [release workflow](../../.github/workflows/release.yml) are merged.
 
 ## How versions are assigned
 

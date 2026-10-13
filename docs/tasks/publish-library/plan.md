@@ -6,7 +6,7 @@ Consumers should be able to install Anyo from PyPI and list it in `requirements.
 
 Status: in-progress
 Last updated: 2026-10-13
-Scope: licensing, metadata, automatic alpha versioning, installed-artifact verification, GitHub Actions, release documentation, and PyPI publication.
+Scope: licensing, metadata, automatic alpha versioning, installed-artifact verification, GitHub Actions, release documentation, PyPI publication, and the macOS Git-cleanup failure exposed by the first release run.
 
 ## Release decisions
 
@@ -20,9 +20,9 @@ Scope: licensing, metadata, automatic alpha versioning, installed-artifact verif
 
 ## Remaining dependencies
 
-Publication has not occurred. The release PR must be merged into `main`, and the owner must register the pending Trusted Publisher in [PyPI account publishing](https://pypi.org/manage/account/publishing/). No authenticated PyPI account access is available to complete that setup. A pending publisher does not reserve the `anyo` name; only an accepted upload establishes publication.
+Publication has not occurred. [PR #4](https://github.com/cpapidas/anyo/pull/4) is merged into `main` at `52e138f`, and automatic releases are active. The first release stopped at a macOS test failure before upload. The owner confirmed registration of the pending Trusted Publisher in [PyPI account publishing](https://pypi.org/manage/account/publishing/). A pending publisher does not reserve the `anyo` name; only an accepted upload establishes publication.
 
-The earlier GitHub workflow-upload block is resolved through the repository's working SSH remote. The GitHub `pypi` environment exists and restricts deployments to `main`. Active workflow files are included in the PR; the previous inactive patch is removed. No manual package tag or release dispatch is needed to start the new flow after merge.
+The earlier GitHub workflow-upload block is resolved through the repository's working SSH remote. The GitHub `pypi` environment exists and restricts deployments to `main`. Active workflow files are merged; the previous inactive patch is removed. No manual package tag or release dispatch is needed.
 
 ## Completion criteria
 
@@ -31,13 +31,15 @@ The earlier GitHub workflow-upload block is resolved through the repository's wo
 - [x] Fresh source-to-wheel artifacts contain MIT license metadata/text, runtime resources, and typing metadata, with the expected tag-derived version.
 - [x] Current release scripts and workflow definitions pass their applicable checks, including rerun/version/artifact behavior.
 - [x] CI verifies installed artifacts on Linux/macOS and Python 3.12–3.15; every release must pass its own matrix before upload.
-- [ ] The release PR is merged and the pending PyPI Trusted Publisher is configured.
+- [x] The release PR is merged.
+- [ ] The macOS Git-cleanup failure is repaired and the release's full check matrix passes.
+- [x] The pending PyPI Trusted Publisher is confirmed configured by the owner.
 - [ ] PyPI accepts the exact checked wheel and source archive under the intended account and version.
 - [ ] A clean public-index installation and the published project page are verified.
 
 ## Current verification and outcome
 
-The implementation is in [PR #4](https://github.com/cpapidas/anyo/pull/4). On 2026-10-13:
+The implementation merged in [PR #4](https://github.com/cpapidas/anyo/pull/4). Its preparation checks on 2026-10-13:
 
 - An isolated build from a temporary Git clone tagged locally as `v0.1.0a1` produced a source archive and then a wheel from that archive. The verification tag was not pushed. Both artifacts passed strict Twine checks and the release metadata/resource guard, including matching MIT license text.
 - All 64 wheel runtime/resource files matched source. The source archive included release scripts and tests; archive inspection found no local environment, credential, cache, or Git directories.
@@ -48,7 +50,11 @@ The implementation is in [PR #4](https://github.com/cpapidas/anyo/pull/4). On 20
 - An [initial GitHub run](https://github.com/cpapidas/anyo/actions/runs/38345545322) exposed an intermittent macOS OmO process-cleanup failure. The [subsequent run](https://github.com/cpapidas/anyo/actions/runs/38345709784) passed build, lint, and all eight installed-package environments. The failure was still repaired rather than dismissed as a flaky check: Darwin can report `EPERM` while a process group contains only unreaped children. Cleanup now retries that response within its shutdown timeout and still raises persistent permission errors. All 41 focused OmO runtime tests passed, including six new deterministic regressions. The [PR checks](https://github.com/cpapidas/anyo/pull/4/checks) track validation of the final revision.
 - Ten changed documentation openings and 151 local links/anchors passed inspection.
 
-The GitHub `pypi` environment now permits deployments from `main`. Publication remains unverified until the PyPI publisher is configured, the exact artifacts are accepted, and a clean public-index installation succeeds.
+The [first automatic release run](https://github.com/cpapidas/anyo/actions/runs/38346668062) created `v0.1.0a1` and passed its build and metadata checks. Seven installed-package environments passed; a repository checkout test failed on macOS/Python 3.15, so publication was skipped.
+
+The CI trace wraps an `OSError` as `storage_unavailable` without exposing its original errno. A deterministic Git-cleanup `EPERM` reproduction produces the same public failure during fallback from a missing ref to a commit SHA. The fix retries Darwin `EPERM` for at most one second while preserving persistent denials and other OS errors. All 58 repository tests passed (two live tests deselected), including five new regressions; Ruff, formatting, mypy, and diff checks passed. Full installed-artifact and CI verification follow before publication. The original CI errno is not established by the reproduction.
+
+The GitHub `pypi` environment permits deployments from `main`. Publication remains unverified until release checks pass, the PyPI publisher is confirmed configured, the exact artifacts are accepted, and a clean public-index installation succeeds.
 
 ## Earlier candidate verification
 
