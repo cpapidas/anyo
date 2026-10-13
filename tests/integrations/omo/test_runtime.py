@@ -3,12 +3,18 @@
 import asyncio
 import json
 import os
+import signal
+import sys
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
 import anyo
 from anyo.application import Application
+from anyo.integrations.omo import _runtime as runtime
 from anyo.integrations.omo import omo_harness
+from anyo.integrations.omo._configuration import Settings
 
 MODEL = "minimax/MiniMax-M2.7"
 
@@ -156,6 +162,68 @@ def test_timeout_cleans_process_group(executable, tmp_path):
     with pytest.raises(ProcessLookupError):
         os.killpg(pid, 0)
     assert not list((tmp_path / "state").iterdir())
+
+
+@pytest.mark.parametrize("denied_signal", [signal.SIGTERM, signal.SIGKILL])
+def test_cleanup_waits_for_darwin_zombie_group_to_disappear(monkeypatch, denied_signal):
+    async def exercise():
+        clock = [0.0]
+        loop = asyncio.get_running_loop()
+        monkeypatch.setattr(loop, "time", lambda: clock[0])
+        monkeypatch.setattr(sys, "platform", "darwin")
+
+        async def yield_to_reaper(delay):
+            clock[0] += delay
+
+        monkeypatch.setattr(runtime.asyncio, "sleep", yield_to_reaper)
+        denials = iter([PermissionError(1, "Zombie group"), ProcessLookupError()])
+
+        def kill_group(pid, signum):
+            if signum == denied_signal:
+                raise next(denials)
+
+        monkeypatch.setattr(runtime.os, "killpg", kill_group)
+        stopped = []
+        monkeypatch.setattr(runtime, "notify_process_stopped", stopped.append)
+        process = SimpleNamespace(pid=12345, stdin=None, wait=AsyncMock(return_value=0))
+        owned = runtime._Process(Settings(models=(), shutdown_timeout=0.03))
+        owned.process = process
+        await owned.close()
+        process.wait.assert_awaited()
+        assert stopped == [process.pid]
+        assert 0 < clock[0] <= owned.settings.shutdown_timeout
+
+    asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("platform", ["darwin", "linux"])
+@pytest.mark.parametrize("denied_signal", [signal.SIGTERM, signal.SIGKILL])
+def test_cleanup_preserves_permission_failures(monkeypatch, platform, denied_signal):
+    async def exercise():
+        clock = [0.0]
+        loop = asyncio.get_running_loop()
+        monkeypatch.setattr(loop, "time", lambda: clock[0])
+        monkeypatch.setattr(sys, "platform", platform)
+
+        async def yield_to_reaper(delay):
+            clock[0] += delay
+
+        monkeypatch.setattr(runtime.asyncio, "sleep", yield_to_reaper)
+        denied = PermissionError(1, "Permission denied")
+
+        def kill_group(pid, signum):
+            if signum == denied_signal:
+                raise denied
+
+        monkeypatch.setattr(runtime.os, "killpg", kill_group)
+        owned = runtime._Process(Settings(models=(), shutdown_timeout=0.03))
+        owned.process = SimpleNamespace(pid=12345, stdin=None, wait=AsyncMock(return_value=0))
+        with pytest.raises(PermissionError) as raised:
+            await owned.close()
+        assert raised.value is denied
+        assert clock[0] == (owned.settings.shutdown_timeout if platform == "darwin" else 0)
+
+    asyncio.run(exercise())
 
 
 def test_cancellation_and_capacity(executable, tmp_path):

@@ -6,6 +6,7 @@ import asyncio
 import json
 import os
 import signal
+import sys
 import tempfile
 from collections.abc import Callable
 from importlib.resources import files
@@ -125,25 +126,38 @@ class _Process:
         except (BrokenPipeError, ConnectionResetError):
             raise OmoError("process_failed", "OmO closed its input") from None
 
+    async def _signal_group(self, signum: signal.Signals) -> None:
+        assert self.process
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + self.settings.shutdown_timeout
+        while True:
+            try:
+                os.killpg(self.process.pid, signum)
+                return
+            except ProcessLookupError:
+                return
+            except PermissionError:
+                # Darwin skips zombies when signalling groups and returns EPERM
+                # while a group has only unreaped members. Wait for the reaper,
+                # but preserve genuine permission failures after a bounded retry.
+                delay = min(0.01, deadline - loop.time())
+                if sys.platform != "darwin" or delay <= 0:
+                    raise
+                await asyncio.sleep(delay)
+
     async def close(self) -> None:
         process = self.process
         if process:
             if process.stdin:
                 process.stdin.close()
-            try:
-                os.killpg(process.pid, signal.SIGTERM)
-            except ProcessLookupError:
-                pass
+            await self._signal_group(signal.SIGTERM)
             try:
                 async with asyncio.timeout(self.settings.shutdown_timeout):
                     await process.wait()
             except TimeoutError:
                 pass
             finally:
-                try:
-                    os.killpg(process.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
+                await self._signal_group(signal.SIGKILL)
                 await process.wait()
                 notify_process_stopped(process.pid)
         if self.stderr:

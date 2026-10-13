@@ -30,6 +30,8 @@ The tag is the authoritative release version. `setuptools-scm` resolves the pack
 
 Failed runs can leave gaps in the alpha sequence. Re-running the original workflow run keeps its run number and therefore the same release version; a retry does not allocate another alpha. Run numbers reflect run creation, not upload completion order. [GitHub run context](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#github-context).
 
+Keep the release workflow's run history. Replacing it with a new workflow requires reconciling its run counter with existing release tags; the tag guard rejects a version that already belongs to another commit.
+
 The release workflow queues up to 100 pending runs. This is a bounded queue, so an unlimited burst of merges is not a guarantee of publication for every merge. Uploads can finish out of version order. Inspect failed or cancelled runs in Actions instead of assuming that a merge or tag means publication succeeded. [GitHub concurrency](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency).
 
 ## Checks before upload

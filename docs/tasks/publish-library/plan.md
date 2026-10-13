@@ -30,7 +30,7 @@ The earlier GitHub workflow-upload block is resolved through the repository's wo
 - [x] Installation instructions distinguish pending publication, source/wheel installation, published version pins, optional extras, and external executables.
 - [x] Fresh source-to-wheel artifacts contain MIT license metadata/text, runtime resources, and typing metadata, with the expected tag-derived version.
 - [x] Current release scripts and workflow definitions pass their applicable checks, including rerun/version/artifact behavior.
-- [ ] CI verifies installed artifacts on Linux/macOS and Python 3.12–3.15.
+- [x] CI verifies installed artifacts on Linux/macOS and Python 3.12–3.15; every release must pass its own matrix before upload.
 - [ ] The release PR is merged and the pending PyPI Trusted Publisher is configured.
 - [ ] PyPI accepts the exact checked wheel and source archive under the intended account and version.
 - [ ] A clean public-index installation and the published project page are verified.
@@ -45,7 +45,7 @@ The implementation is in [PR #4](https://github.com/cpapidas/anyo/pull/4). On 20
 - **917 tests passed, with 41 live tests deselected**, against that installed wheel on macOS ARM64/Python 3.12 (48.08 seconds). This includes 39 release tests covering immutable version tags, full and partial upload retries, metadata validation, and conflicting remote hashes.
 - Ruff lint and formatting passed. Mypy passed for 57 library modules and, separately, the three release scripts. The Docker `wheel` target built successfully without Git metadata using development version `0.0.dev0` and included the license.
 - Actionlint 1.7.12 passed with only its unsupported `concurrency.queue` diagnostic excluded. `queue: max` is documented by GitHub; the installed validator predates support for that key.
-- [GitHub verification](https://github.com/cpapidas/anyo/actions/runs/38345545322) has passed build and lint; its eight installed-package matrix jobs are still running at this update.
+- An [initial GitHub run](https://github.com/cpapidas/anyo/actions/runs/38345545322) exposed an intermittent macOS OmO process-cleanup failure. The [subsequent run](https://github.com/cpapidas/anyo/actions/runs/38345709784) passed build, lint, and all eight installed-package environments. The failure was still repaired rather than dismissed as a flaky check: Darwin can report `EPERM` while a process group contains only unreaped children. Cleanup now retries that response within its shutdown timeout and still raises persistent permission errors. All 41 focused OmO runtime tests passed, including six new deterministic regressions. The [PR checks](https://github.com/cpapidas/anyo/pull/4/checks) track validation of the final revision.
 - Ten changed documentation openings and 151 local links/anchors passed inspection.
 
 The GitHub `pypi` environment now permits deployments from `main`. Publication remains unverified until the PyPI publisher is configured, the exact artifacts are accepted, and a clean public-index installation succeeds.
