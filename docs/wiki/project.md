@@ -25,7 +25,7 @@ You can already call your own code inside a pipeline. You configure remote webho
 
 ## Release status
 
-This is a local development distribution. The version is defined in [pyproject.toml](../../pyproject.toml); licensing and package publication remain undecided.
+The first alpha candidate is `0.1.0a1`, defined in [pyproject.toml](../../pyproject.toml). Publication to PyPI is requested but has not occurred. Licensing and PyPI account setup remain unresolved; follow the [release task](../tasks/publish-library/plan.md) for verified progress and the [installation guide](installation.md) for available installation methods.
 
 Read the [product direction](../knowledge/product-overview.md) for decisions and open questions, or the [provider guide](../knowledge/webhook-triggers.md#provider-packages-and-extension-contract) to add an integration.
 

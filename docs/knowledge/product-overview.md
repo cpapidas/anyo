@@ -70,7 +70,7 @@ These are design suggestions from the discussion, not accepted implementation co
 - Script execution contract and how runtime environments are prepared.
 - Outcome metrics, feedback collection, optimization strategy, and promotion policy.
 - Broader worker orchestration beyond the [SQLite and Redis contract](worker-queues.md), automatic remote webhook provisioning, and future integrations beyond the implemented GitHub, Slack, Better Stack, and Notion providers.
-- License, package-index name availability, versioning policy, and release destination. The current `anyo` distribution is local development version `0.1.0.dev0`; no publication is implied.
+- License and package-index name ownership remain open. The user requested PyPI publication; the [release task](../tasks/publish-library/plan.md) prepares `anyo` version `0.1.0a1` with an alpha compatibility policy. Publication is pending license selection and account access; preparation does not establish index ownership or a successful upload.
 
 ## Sources
 

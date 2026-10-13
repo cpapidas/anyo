@@ -68,8 +68,13 @@ Give durable hooks an explicit `hook_id`, and set `hook_version` when their beha
 
 ```python
 anyo.add_hook(
-    provider="github", action="pr_created", organization="your-org", repository="your-repo",
-    pipeline=report_pull_request, hook_id="report-pull-request", hook_version="1",
+    provider="github",
+    action="pr_created",
+    organization="your-org",
+    repository="your-repo",
+    pipeline=report_pull_request,
+    hook_id="report-pull-request",
+    hook_version="1",
 )
 ```
 
@@ -166,9 +171,11 @@ from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from anyo.hooks import HookEvent
 
+
 @dataclass(frozen=True)
 class TicketEvent(HookEvent):
     pass  # Custom provider data stays in payload for this example.
+
 
 class TicketCodec:
     name = "consumer.ticket.v1"
@@ -195,6 +202,7 @@ class TicketCodec:
         if sha is not None and not isinstance(sha, str):
             raise ValueError("Invalid head SHA")
         return TicketEvent(**data)
+
 
 # Include your adapter in providers, and register the codec:
 # Application(providers=[ticket_provider], event_codecs=[TicketCodec()], ...)

@@ -60,8 +60,8 @@ Seeds contain repository contents: transfer them through a trusted channel. Redi
 ## Clean up
 
 ```python
-cache.maintain()                  # Recover abandoned workspaces and evict idle data.
-cache.purge(url=repository_url)   # Remove one repository after its users finish.
+cache.maintain()  # Recover abandoned workspaces and evict idle data.
+cache.purge(url=repository_url)  # Remove one repository after its users finish.
 ```
 
 Active workspaces are protected by OS locks, even across containers. A queue lease timeout alone never permits deletion. To revoke cached access, stop its users and purge the cache and any seeds.

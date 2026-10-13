@@ -3,7 +3,7 @@
 ## For Humans
 
 <p align="center">
-  <img src="doc/asserts/anyo-logo.png" alt="Anyo logo" width="360">
+  <img src="https://raw.githubusercontent.com/cpapidas/anyo/main/doc/asserts/anyo-logo.png" alt="Anyo logo" width="360">
 </p>
 
 With Anyo, you can ask your AI model to build workflows such as:
@@ -38,7 +38,7 @@ source .venv/bin/activate
 python -m pip install .
 ```
 
-Anyo is installed from source; this project has no published package yet.
+The first alpha, `0.1.0a1`, is being prepared for PyPI. Until publication is confirmed, install from source as above. See [installation and requirements.txt](https://github.com/cpapidas/anyo/blob/main/docs/wiki/installation.md) for wheel installation, the planned PyPI requirement, and optional dependencies.
 
 Save this as `main.py`. Replace `your-org` and `your-repo` with your repository owner and name:
 
@@ -70,18 +70,18 @@ export ANYO_GITHUB_WEBHOOK_SECRET='replace-with-a-long-random-secret'
 python main.py
 ```
 
-[Connect GitHub](docs/wiki/github-hooks.md#connect-github), then open a pull request. Your function prints its number.
+[Connect GitHub](https://github.com/cpapidas/anyo/blob/main/docs/wiki/github-hooks.md#connect-github), then open a pull request. Your function prints its number.
 
 Anyo listens on `127.0.0.1:8000` and saves jobs in `.anyo/queue.sqlite3`. Everything runs in one process by default.
 
 ## How-to guides
 
-- [Connect GitHub](docs/wiki/github-hooks.md), [Slack](docs/wiki/slack-hooks.md), [Better Stack](docs/wiki/betterstack-hooks.md), or [Notion](docs/wiki/notion-hooks.md).
-- [Run an AI prompt](docs/wiki/run-prompts.md) or [prepare repository files](docs/wiki/repository-workspaces.md).
-- [Choose SQLite or Redis](docs/wiki/workers.md) or [run separate workers](docs/wiki/separate-workers.md).
-- [Open the dashboard](docs/wiki/operations-ui.md).
-- [Use your HTTP server or add routes](docs/wiki/http-hosting.md).
-- [Understand deliveries and retries](docs/wiki/delivery.md).
-- [Develop Anyo](docs/wiki/development.md).
+- [Connect GitHub](https://github.com/cpapidas/anyo/blob/main/docs/wiki/github-hooks.md), [Slack](https://github.com/cpapidas/anyo/blob/main/docs/wiki/slack-hooks.md), [Better Stack](https://github.com/cpapidas/anyo/blob/main/docs/wiki/betterstack-hooks.md), or [Notion](https://github.com/cpapidas/anyo/blob/main/docs/wiki/notion-hooks.md).
+- [Run an AI prompt](https://github.com/cpapidas/anyo/blob/main/docs/wiki/run-prompts.md) or [prepare repository files](https://github.com/cpapidas/anyo/blob/main/docs/wiki/repository-workspaces.md).
+- [Choose SQLite or Redis](https://github.com/cpapidas/anyo/blob/main/docs/wiki/workers.md) or [run separate workers](https://github.com/cpapidas/anyo/blob/main/docs/wiki/separate-workers.md).
+- [Open the dashboard](https://github.com/cpapidas/anyo/blob/main/docs/wiki/operations-ui.md).
+- [Use your HTTP server or add routes](https://github.com/cpapidas/anyo/blob/main/docs/wiki/http-hosting.md).
+- [Understand deliveries and retries](https://github.com/cpapidas/anyo/blob/main/docs/wiki/delivery.md).
+- [Develop Anyo](https://github.com/cpapidas/anyo/blob/main/docs/wiki/development.md).
 
-[All guides](docs/wiki/README.md) · [Project status](docs/wiki/project.md) · [Runnable examples](examples/README.md)
+[All guides](https://github.com/cpapidas/anyo/blob/main/docs/wiki/README.md) · [Project status](https://github.com/cpapidas/anyo/blob/main/docs/wiki/project.md) · [Runnable examples](https://github.com/cpapidas/anyo/blob/main/examples/README.md)

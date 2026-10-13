@@ -7,6 +7,7 @@ Pick what you want to do. Each guide gives you a short example and links to more
 | I want to… | Read |
 | --- | --- |
 | Try Anyo for the first time | [Quick start](../../README.md#try-it) |
+| Install Anyo or select optional dependencies | [Installation](installation.md) |
 | Run code when a pull request opens | [GitHub hooks](github-hooks.md) |
 | Handle Slack events and commands | [Slack hooks](slack-hooks.md) |
 | Run code when Notion content changes | [Notion hooks](notion-hooks.md) |
@@ -20,6 +21,7 @@ Pick what you want to do. Each guide gives you a short example and links to more
 | View runs, logs, and controls | [Dashboard](operations-ui.md) |
 | Understand duplicate events and retries | [Delivery behavior](delivery.md) |
 | Change or test Anyo | [Development](development.md) |
+| Prepare and publish a package version | [Releases](releases.md) |
 | See what is built and what is planned | [Project status](project.md) |
 
 For detailed contracts and past work, use the [documentation index](../README.md).
