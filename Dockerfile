@@ -3,10 +3,12 @@
 # Runs the minimal review example by default; consumer code can replace /app.
 
 FROM python:3.12-slim-bookworm AS wheel
+ARG ANYO_VERSION=0.0.dev0
 WORKDIR /build
-COPY pyproject.toml README.md ./
+COPY pyproject.toml README.md LICENSE ./
 COPY src/ ./src/
-RUN python -m pip wheel --no-cache-dir --no-deps --wheel-dir /wheels .
+RUN SETUPTOOLS_SCM_PRETEND_VERSION_FOR_ANYO="$ANYO_VERSION" \
+    python -m pip wheel --no-cache-dir --no-deps --wheel-dir /wheels .
 
 FROM python:3.12-slim-bookworm AS opencode-download
 ARG TARGETARCH
