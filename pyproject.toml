@@ -4,14 +4,26 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "anyo"
-version = "0.1.0.dev0"
+version = "0.1.0a1"
 description = "A Python framework for event-driven AI pipelines"
 readme = "README.md"
 requires-python = ">=3.12"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3 :: Only",
+    "Typing :: Typed",
+]
 dependencies = [
     "starlette>=1.7.0",
     "uvicorn>=0.53.0",
 ]
+
+[project.urls]
+Repository = "https://github.com/cpapidas/anyo"
+Documentation = "https://github.com/cpapidas/anyo/blob/main/docs/wiki/README.md"
+Issues = "https://github.com/cpapidas/anyo/issues"
+Changelog = "https://github.com/cpapidas/anyo/releases"
 
 [project.optional-dependencies]
 opencode = ["httpx2>=2.13.1"]
