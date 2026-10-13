@@ -5,7 +5,7 @@
 A consumer connects a Python function to a GitHub, Slack, or Better Stack event and starts Anyo from the project's main file. Anyo authenticates webhooks, selects matching hooks, and runs those functions in the background; Slack interactions can also use an immediate response handler. This document records the shared contracts and delivery limits.
 
 Status: draft  
-Last updated: 2026-10-12
+Last updated: 2026-10-13
 Scope: implemented [webhook triggers](../tasks/webhook-triggering-system/plan.md), immediate responses, and their integration with [durable workers](worker-queues.md). The worker task records completed verification; detailed APIs are engineering decisions within the authorized implementation.
 
 ## Registration and callbacks
@@ -117,7 +117,7 @@ Terminal records expire from completion time; queued/running records never expir
 
 ## Tooling
 
-The initial baseline is Python 3.12, with standard `venv`/`pip`, setuptools for packaging, and `build` for source-to-wheel verification. Starlette 1.7.0 and Uvicorn 0.53.0 are the tested runtime lower bounds; they are base dependencies so the default installation can start its listener. GitHub verification needs no SDK or optional extra. Pytest, HTTPX2 (used by Starlette's test client), Ruff, and mypy are development tools. The distribution uses the local name `anyo` and initial development version `0.1.0.dev0`; no index-name ownership, publication, license, or release policy is implied.
+The initial baseline is Python 3.12, with standard `venv`/`pip`, setuptools for packaging, and `build` for source-to-wheel verification. Starlette 1.7.0 and Uvicorn 0.53.0 are the tested runtime lower bounds; they are base dependencies so the default installation can start its listener. GitHub verification needs no SDK or optional extra. Pytest, HTTPX2 (used by Starlette's test client), Ruff, and mypy are development tools. The distribution name is `anyo`, with MIT licensing and tag-derived alpha versions through `setuptools-scm`. The [release task](../tasks/publish-library/plan.md) records publication progress; no index-name ownership or successful upload is implied.
 
 ## Sources
 

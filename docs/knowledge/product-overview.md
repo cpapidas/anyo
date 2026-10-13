@@ -5,7 +5,7 @@
 A developer wants to respond to a GitHub event, run their own code, ask agents to analyze what happened, and use the results in later steps. Anyo is intended to make workflows like this programmable while allowing prompts to improve through feedback on their outcomes. This document captures the agreed direction and separates it from implementation ideas that still need design.
 
 Status: draft  
-Last updated: 2026-10-12
+Last updated: 2026-10-13
 Scope: Anyo product direction and initial workspace decisions.
 
 ## Confirmed direction
@@ -13,6 +13,7 @@ Scope: Anyo product direction and initial workspace decisions.
 - The project is named **Anyo**.
 - Build a custom AI pipeline framework in **Python**. Python replaces the earlier discussion of a Go runtime for this framework.
 - Deliver Anyo as an installable library with one import package under `src/anyo/`. Organize code by capability, start with shallow modules, and grow them into subpackages as implementation requires. The [package structure skill](../../skills/anyo-structure/SKILL.md) records ownership, dependency boundaries, and public API conventions.
+- Publish Anyo under the MIT license. The user requested automatic releases for merges into the default branch, `main`; this implementation retains the prepared alpha release line. The [release task](../tasks/publish-library/plan.md) implements `0.1.0aN` versions from workflow run numbers and authoritative Git tags, with `setuptools-scm` resolving package versions and no version-bump commits. Publication remains pending the PR's merge and PyPI Trusted Publisher setup.
 - Let consumers use their own HTTP host and access Anyo's HTTP application to add routes and other extensions, while retaining the convenience server. Public `asgi`, `create_application`, `lifespan`, and `serve` APIs support standalone and mounted asyncio ASGI applications. The [hosting guide](../wiki/http-hosting.md) shows usage; the [embedding task](../tasks/embeddable-http-application/plan.md) records implementation and verification.
 - Let developers configure agents and write workflow behavior in code, including conditional steps and iteration over results.
 - Start event-driven pipelines through registered hooks. The consumer installs Anyo in a Python project, calls `anyo.add_hook(...)` for each event-to-pipeline binding, and calls `anyo.start()` in the main file to start receiving events with useful runtime defaults.
@@ -42,7 +43,7 @@ GitHub PR-created webhooks are implemented as the first trigger. Repository clon
 
 ## Implemented foundation
 
-The first implementation uses Python 3.12 or later, setuptools, and standard `venv`/`pip` workflows. Starlette receives webhooks and Uvicorn serves the default listener. These are implementation decisions made while carrying out the requested task; broader workflow execution and release policy remain open.
+The first implementation uses Python 3.12 or later, setuptools, and standard `venv`/`pip` workflows. Starlette receives webhooks and Uvicorn serves the default listener. These are implementation decisions made while carrying out the requested task; broader workflow execution remains open. The [release guide](../wiki/releases.md) records the selected alpha publication policy and checks.
 
 Hooks receive a typed event containing the target repository, PR number, commit SHA, delivery ID, and payload. Both synchronous and asynchronous callbacks are supported. The default listener is `127.0.0.1:8000/webhooks/github`, with four concurrent pipelines and a capacity of 100 running or queued jobs. Provider adapters extend the trigger system without adding GitHub behavior to its core.
 
@@ -70,7 +71,7 @@ These are design suggestions from the discussion, not accepted implementation co
 - Script execution contract and how runtime environments are prepared.
 - Outcome metrics, feedback collection, optimization strategy, and promotion policy.
 - Broader worker orchestration beyond the [SQLite and Redis contract](worker-queues.md), automatic remote webhook provisioning, and future integrations beyond the implemented GitHub, Slack, Better Stack, and Notion providers.
-- License and package-index name ownership remain open. The user requested PyPI publication; the [release task](../tasks/publish-library/plan.md) prepares `anyo` version `0.1.0a1` with an alpha compatibility policy. Publication is pending license selection and account access; preparation does not establish index ownership or a successful upload.
+- Package-index name ownership remains unconfirmed until PyPI accepts the first publication. The selected distribution name is `anyo`; preparation and a pending Trusted Publisher do not establish ownership or a successful upload. Stable release compatibility and cadence beyond the selected alpha policy remain open.
 
 ## Sources
 
@@ -100,3 +101,4 @@ These are design suggestions from the discussion, not accepted implementation co
 
 - Project follow-up, 2026-10-12 (no share link supplied): authorized implementation of the Notion task, a new branch, and a pull request, working alone. The [contract](notion-hooks.md) records implemented behavior and the [task](../tasks/notion-hooks/plan.md) records verification.
 - Project conversation, 2026-10-12 (no share link supplied): requested creation of a task for library use with a consumer-owned HTTP server and access to extend Anyo's HTTP application; requested autonomous work without delegation or clarification, then authorized implementation of the [task plan](../tasks/embeddable-http-application/plan.md).
+- Project follow-up, 2026-10-13 (no share link supplied): selected the MIT license and requested automatic publication for merges to the default branch. The repository's default branch is `main`; the [release task](../tasks/publish-library/plan.md) records implementation and remaining PyPI setup.

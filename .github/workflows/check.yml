@@ -1,0 +1,122 @@
+name: Check library
+
+on:
+  pull_request:
+  workflow_call:
+    inputs:
+      release-tag:
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.release-tag || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - run: python -m pip install '.[dev,opencode,redis]'
+      - run: python -m ruff check .
+      - run: python -m ruff format --check .
+      - run: python -m mypy
+
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.release-tag || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Find this run's original distributions on a retry
+        id: prior
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_NAME: python-distributions-${{ github.run_id }}
+        run: |
+          gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" \
+            --jq '.artifacts[] | [.name, .expired] | @tsv' > "$RUNNER_TEMP/artifacts"
+          while IFS=$'\t' read -r name expired; do
+            if [[ "$name" == "$ARTIFACT_NAME" ]]; then
+              if [[ "$expired" == true ]]; then
+                echo 'Original release artifact expired; do not rebuild a published version.' >&2
+                exit 1
+              fi
+              echo 'found=true' >> "$GITHUB_OUTPUT"
+            fi
+          done < "$RUNNER_TEMP/artifacts"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: steps.prior.outputs.found == 'true'
+        with:
+          name: python-distributions-${{ github.run_id }}
+          path: dist
+          github-token: ${{ github.token }}
+          run-id: ${{ github.run_id }}
+      - run: python -m pip install build twine
+      - run: python -m build
+        if: steps.prior.outputs.found != 'true'
+      - run: python -m twine check --strict dist/*
+      - name: Check release version, license and resources
+        if: inputs.release-tag != ''
+        env:
+          RELEASE_TAG: ${{ inputs.release-tag }}
+        run: python scripts/check_release.py "$RELEASE_TAG" dist
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.prior.outputs.found != 'true'
+        with:
+          name: python-distributions-${{ github.run_id }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 90
+
+  installed-tests:
+    needs: build
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python: ['3.12', '3.13', '3.14', '3.15']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.release-tag || github.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: python-distributions-${{ github.run_id }}
+          path: dist
+          github-token: ${{ github.token }}
+          run-id: ${{ github.run_id }}
+      - name: Verify clean base installation
+        shell: bash
+        run: |
+          python -m venv "$RUNNER_TEMP/anyo-verify"
+          echo "$RUNNER_TEMP/anyo-verify/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/anyo-verify/bin/python" -m pip install dist/*.whl
+          cd "$RUNNER_TEMP"
+          "$RUNNER_TEMP/anyo-verify/bin/python" -I "$GITHUB_WORKSPACE/scripts/smoke_install.py"
+          "$RUNNER_TEMP/anyo-verify/bin/python" -m pip check
+      - name: Test the installed wheel with optional integrations
+        shell: bash
+        run: |
+          wheel=("$GITHUB_WORKSPACE"/dist/*.whl)
+          python -m pip install "${wheel[0]}[dev,opencode,redis]"
+          python -m pip check
+          cd "$RUNNER_TEMP"
+          python -I -m pytest -c "$GITHUB_WORKSPACE/pyproject.toml" "$GITHUB_WORKSPACE/tests"

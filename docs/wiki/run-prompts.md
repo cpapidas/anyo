@@ -24,6 +24,8 @@ Both review the small function in [review.md](../../examples/harness-review/revi
 
 The [Dockerfile](../../Dockerfile) includes OmO 5.1.21, OpenCode 1.18.34, and their Python dependencies. No local harness installation or setup script is needed.
 
+Local Docker builds report Anyo version `0.0.dev0`. When building from a release tag, set `--build-arg ANYO_VERSION=<tag-version-without-v>` to give the image's Python package that release version.
+
 ## Use it in Python
 
 Outside Docker, [install Anyo](../../README.md#try-it) and the selected executable. OpenCode also needs `python -m pip install '.[opencode]'` from the checkout.
