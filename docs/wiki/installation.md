@@ -4,7 +4,7 @@
 
 Install Anyo in the same environment as your Python application. Python 3.12 or later is required.
 
-Anyo is MIT-licensed. Automatic `0.1.0aN` alpha releases are active, but the first publication is still pending release checks and PyPI publisher confirmation. Use the source or wheel instructions until the [release task](../tasks/publish-library/plan.md) confirms publication.
+Anyo is MIT-licensed. Automatic `0.1.0aN` alpha releases are active, but the first publication is still pending release checks. Use the source or wheel instructions until the [release task](../tasks/publish-library/plan.md) confirms publication.
 
 ## From source or a built wheel
 

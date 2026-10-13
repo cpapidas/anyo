@@ -25,7 +25,7 @@ You can already call your own code inside a pipeline. You configure remote webho
 
 ## Release status
 
-Anyo uses the [MIT license](../../LICENSE). Automatic `0.1.0aN` releases are active for pushes to `main`, with versions derived from workflow-created Git tags. The first release was stopped by a macOS test failure before upload; publication awaits its repair and PyPI Trusted Publisher confirmation. Follow the [release task](../tasks/publish-library/plan.md) for verified progress, the [release guide](releases.md) for the policy, and the [installation guide](installation.md) for available installation methods.
+Anyo uses the [MIT license](../../LICENSE). Automatic `0.1.0aN` releases are active for pushes to `main`, with versions derived from workflow-created Git tags. The first release was stopped by a macOS test failure before upload; publication awaits its repair. Follow the [release task](../tasks/publish-library/plan.md) for verified progress, the [release guide](releases.md) for the policy, and the [installation guide](installation.md) for available installation methods.
 
 Read the [product direction](../knowledge/product-overview.md) for decisions and open questions, or the [provider guide](../knowledge/webhook-triggers.md#provider-packages-and-extension-contract) to add an integration.
 
