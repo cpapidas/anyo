@@ -117,7 +117,7 @@ Terminal records expire from completion time; queued/running records never expir
 
 ## Tooling
 
-The initial baseline is Python 3.12, with standard `venv`/`pip`, setuptools for packaging, and `build` for source-to-wheel verification. Starlette 1.7.0 and Uvicorn 0.53.0 are the tested runtime lower bounds; they are base dependencies so the default installation can start its listener. GitHub verification needs no SDK or optional extra. Pytest, HTTPX2 (used by Starlette's test client), Ruff, and mypy are development tools. The distribution name is `anyo`, with MIT licensing and tag-derived alpha versions through `setuptools-scm`. The [release task](../tasks/publish-library/plan.md) records publication progress; no index-name ownership or successful upload is implied.
+The initial baseline is Python 3.12, with standard `venv`/`pip`, setuptools for packaging, and `build` for source-to-wheel verification. Starlette 1.7.0 and Uvicorn 0.53.0 are the tested runtime lower bounds; they are base dependencies so the default installation can start its listener. GitHub verification needs no SDK or optional extra. Pytest, HTTPX2 (used by Starlette's test client), Ruff, and mypy are development tools. The distribution name is `anyo`, with MIT licensing and tag-derived alpha versions through `setuptools-scm`. The [release task](../tasks/publish-library/plan.md) records the first PyPI publication, `0.1.0a2`, and its installation checks.
 
 ## Sources
 

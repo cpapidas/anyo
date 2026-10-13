@@ -4,11 +4,11 @@
 
 Merging into `main` starts an automatic alpha release. GitHub Actions builds and checks the distribution, then publishes the checked wheel and source archive to PyPI. Anyo uses the [MIT license](../../LICENSE).
 
-The workflows are active on `main`, and the owner has confirmed the PyPI publisher setup. The first release stopped at a macOS test failure before upload; publication is pending its repair and successful release checks. The [release task](../tasks/publish-library/plan.md) records progress.
+The workflows are active on `main`. Version [0.1.0a2](https://pypi.org/project/anyo/0.1.0a2/) was the first successful publication after the macOS cleanup fix. The [release task](../tasks/publish-library/plan.md) records the release and clean-install verification.
 
-## Set up PyPI once
+## Publisher configuration
 
-Sign in to the intended PyPI owner account and open [account publishing](https://pypi.org/manage/account/publishing/). Add a pending GitHub Trusted Publisher with these exact values:
+The PyPI project uses a GitHub Trusted Publisher with these values:
 
 | Field | Value |
 | --- | --- |
@@ -18,7 +18,7 @@ Sign in to the intended PyPI owner account and open [account publishing](https:/
 | Workflow filename | `release.yml` |
 | Environment | `pypi` |
 
-The repository's `pypi` environment is configured to allow deployments from `main`. The publication job uses that environment and OIDC, so it needs no long-lived PyPI API token. A pending publisher creates the project on its first successful upload; it does not reserve the name. The owner has confirmed this setup. [PyPI's pending publisher guide](https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/).
+The repository's `pypi` environment is configured to allow deployments from `main`. The publication job uses that environment and OIDC, so it needs no long-lived PyPI API token. The first successful upload created the project and converted its pending publisher to a normal publisher. [PyPI's pending publisher guide](https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/).
 
 GitHub access through the repository's SSH remote works. The earlier workflow-permission issue is resolved; the [check workflow](../../.github/workflows/check.yml) and [release workflow](../../.github/workflows/release.yml) are merged.
 
@@ -40,6 +40,8 @@ Run the [development checks](development.md) before merging. The workflows build
 
 The release checks include the MIT license, typing marker, dashboard assets, and prompt resources. During release preparation, also inspect the archives for unwanted local files. Publishing consumes the checked artifacts rather than building another copy. Alpha APIs and durable storage formats may change; describe migrations and unsupported combinations in the release notes.
 
+After upload, the workflow verifies both remote file hashes. It uses a 60-second retry window for missing files to appear in the PyPI API, while invalid responses, network errors, unexpected files, and hash conflicts fail immediately.
+
 ## Recover a failed release
 
 Open the original run in the repository's Actions page. Inspect the failing job and the PyPI project before retrying, especially when an upload's outcome is ambiguous.
@@ -50,14 +52,14 @@ After fixing the one-time publisher configuration, retry the original failed run
 
 ## Verify the public result
 
-Use the version reported by the successful release run. The example below uses `0.1.0a12` only as an illustration; replace it with the actual published version and run it in a fresh environment outside the checkout:
+Use the version reported by the successful release run. The example below checks the first published alpha, `0.1.0a2`; use the release being verified and run it in a fresh environment outside the checkout:
 
 ```sh
-python -m pip install 'anyo==0.1.0a12'
+python -m pip install 'anyo==0.1.0a2'
 python -m pip check
 python -c 'import anyo; from importlib.metadata import version; print(version("anyo"), anyo.__file__)'
 ```
 
-Confirm the project page, version, artifact hashes, README rendering, and extras. Record the result in the [release task](../tasks/publish-library/plan.md) and remove pending-publication notes only after the public installation succeeds.
+Confirm the project page, version, artifact hashes, README rendering, and extras. The [release task](../tasks/publish-library/plan.md) records the first publication; record later consumer-visible changes in the matching GitHub release notes.
 
 [All guides](README.md)

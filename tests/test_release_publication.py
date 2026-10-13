@@ -7,6 +7,7 @@ import json
 import tarfile
 import zipfile
 from pathlib import Path
+from types import SimpleNamespace
 from urllib.error import HTTPError, URLError
 
 import pytest
@@ -53,14 +54,18 @@ def hashes(directory):
     }
 
 
+def remote_document(remote):
+    return {
+        "info": {"name": "anyo", "version": VERSION},
+        "urls": [
+            {"filename": name, "digests": {"sha256": digest}} for name, digest in remote.items()
+        ],
+    }
+
+
 def set_remote(monkeypatch, remote, *, document=None):
     if document is None:
-        document = {
-            "info": {"name": "anyo", "version": VERSION},
-            "urls": [
-                {"filename": name, "digests": {"sha256": digest}} for name, digest in remote.items()
-            ],
-        }
+        document = remote_document(remote)
 
     def request(request, *, timeout):
         assert request.full_url == f"https://pypi.org/pypi/anyo/{VERSION}/json"
@@ -68,6 +73,42 @@ def set_remote(monkeypatch, remote, *, document=None):
         return io.BytesIO(json.dumps(document).encode())
 
     monkeypatch.setattr(publication, "urlopen", request)
+
+
+@pytest.fixture
+def clock(monkeypatch):
+    state = SimpleNamespace(now=0.0, delays=[])
+
+    def sleep(delay):
+        assert delay > 0
+        state.delays.append(delay)
+        state.now += delay
+
+    monkeypatch.setattr(
+        publication,
+        "time",
+        SimpleNamespace(monotonic=lambda: state.now, sleep=sleep),
+        raising=False,
+    )
+    return state
+
+
+def set_responses(monkeypatch, responses):
+    calls = []
+
+    def request(request, *, timeout):
+        assert request.full_url == f"https://pypi.org/pypi/anyo/{VERSION}/json"
+        assert timeout == 30
+        calls.append(request)
+        assert responses, "Unexpected extra PyPI request"
+        response = responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        data = response if isinstance(response, bytes) else json.dumps(response).encode()
+        return io.BytesIO(data)
+
+    monkeypatch.setattr(publication, "urlopen", request)
+    return calls
 
 
 def run(distributions, tmp_path, *arguments):
@@ -126,6 +167,98 @@ def test_verify_requires_both_matching_files_without_creating_upload_directory(
     assert not (tmp_path / "upload").exists()
     set_remote(monkeypatch, dict(list(hashes(distributions).items())[:1]))
     assert run(distributions, tmp_path, "--verify") == 1
+
+
+def test_verify_waits_for_absent_then_partial_publication(
+    distributions, tmp_path, monkeypatch, clock, capsys
+):
+    remote = hashes(distributions)
+    calls = set_responses(
+        monkeypatch,
+        [
+            HTTPError("https://pypi.org", 404, "Not Found", {}, None),
+            remote_document(dict(list(remote.items())[:1])),
+            remote_document(remote),
+        ],
+    )
+    assert run(distributions, tmp_path, "--verify", "--wait-seconds", "5") == 0
+    assert "Verified both PyPI artifacts" in capsys.readouterr().out
+    assert len(calls) == 3
+    assert clock.now == 4
+    assert not (tmp_path / "upload").exists()
+
+
+@pytest.mark.parametrize("partial", [False, True])
+@pytest.mark.parametrize("wait_seconds", ["0", "2.5"])
+def test_verify_missing_files_fails_at_deadline(
+    distributions, tmp_path, monkeypatch, clock, capsys, partial, wait_seconds
+):
+    remote = dict(list(hashes(distributions).items())[:1]) if partial else {}
+    calls = set_responses(monkeypatch, [remote_document(remote)] * 3)
+    assert run(distributions, tmp_path, "--verify", "--wait-seconds", wait_seconds) == 1
+    assert "Missing files on PyPI" in capsys.readouterr().err
+    assert clock.now == float(wait_seconds)
+    assert len(calls) == (1 if wait_seconds == "0" else 3)
+    assert not (tmp_path / "upload").exists()
+
+
+@pytest.mark.parametrize(
+    "problem", ["hash", "unexpected", "http", "network", "timeout", "json", "record"]
+)
+def test_verify_polling_stops_immediately_on_uncertain_or_conflicting_state(
+    distributions, tmp_path, monkeypatch, clock, capsys, problem
+):
+    remote = hashes(distributions)
+    if problem == "hash":
+        remote[next(iter(remote))] = "0" * 64
+        failure = remote_document(remote)
+    elif problem == "unexpected":
+        failure = remote_document({**remote, "unexpected.whl": "0" * 64})
+    else:
+        failure = {
+            "http": HTTPError("https://pypi.org", 503, "Unavailable", {}, None),
+            "network": URLError("unavailable"),
+            "timeout": TimeoutError(),
+            "json": b"not JSON",
+            "record": {},
+        }[problem]
+    calls = set_responses(monkeypatch, [remote_document({}), failure])
+    assert run(distributions, tmp_path, "--verify", "--wait-seconds", "60") == 1
+    assert "Publication check failed" in capsys.readouterr().err
+    assert len(calls) == 2
+    assert clock.now == 2
+    assert not (tmp_path / "upload").exists()
+
+
+@pytest.mark.parametrize("verify", [False, True])
+def test_default_checks_make_one_request_without_waiting(
+    distributions, tmp_path, monkeypatch, clock, verify
+):
+    calls = set_responses(monkeypatch, [remote_document({})])
+    assert run(distributions, tmp_path, *(["--verify"] if verify else [])) == int(verify)
+    assert len(calls) == 1
+    assert clock.delays == []
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["--wait-seconds", "0"],
+        ["--wait-seconds", "60"],
+        ["--verify", "--wait-seconds", "-1"],
+        ["--verify", "--wait-seconds", "nan"],
+        ["--verify", "--wait-seconds", "inf"],
+        ["--verify", "--wait-seconds", "invalid"],
+    ],
+)
+def test_invalid_wait_options_fail_before_network(distributions, tmp_path, monkeypatch, arguments):
+    def unexpected_request(*args, **kwargs):
+        pytest.fail("Invalid wait options must not query PyPI")
+
+    monkeypatch.setattr(publication, "urlopen", unexpected_request)
+    with pytest.raises(SystemExit) as caught:
+        run(distributions, tmp_path, *arguments)
+    assert caught.value.code == 2
 
 
 @pytest.mark.parametrize("suffix", [".whl", ".tar.gz"])

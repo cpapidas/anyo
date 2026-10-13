@@ -4,28 +4,14 @@
 
 Install Anyo in the same environment as your Python application. Python 3.12 or later is required.
 
-Anyo is MIT-licensed. Automatic `0.1.0aN` alpha releases are active, but the first publication is still pending release checks. Use the source or wheel instructions until the [release task](../tasks/publish-library/plan.md) confirms publication.
+Anyo is MIT-licensed and available on [PyPI](https://pypi.org/project/anyo/). The examples below pin `0.1.0a2`, the first published alpha. Automatic releases continue after successful checks on `main`.
 
-## From source or a built wheel
+## From PyPI
 
-From the repository checkout:
-
-```sh
-python -m pip install .
-```
-
-To install a verified wheel without the checkout, use its actual filename. This example uses `0.1.0a12` only to show the filename format:
-
-```sh
-python -m pip install /path/to/anyo-0.1.0a12-py3-none-any.whl
-```
-
-## From PyPI after publication
-
-Put a verified published version in your application's `requirements.txt`. Replace the illustrative `0.1.0a12` below with the version you choose:
+Put the published version in your application's `requirements.txt`:
 
 ```text
-anyo==0.1.0a12
+anyo==0.1.0a2
 ```
 
 Then install and check the package:
@@ -37,15 +23,29 @@ python -c 'import anyo; print(anyo.__file__)'
 
 The explicit version selects the alpha without needing `--pre`. Each successful release run publishes its own alpha; a later merge does not change the version pinned in your application. See [releases](releases.md#how-versions-are-assigned) for the numbering policy.
 
+## From source or a built wheel
+
+From the repository checkout:
+
+```sh
+python -m pip install .
+```
+
+To install a downloaded `0.1.0a2` wheel without the checkout:
+
+```sh
+python -m pip install /path/to/anyo-0.1.0a2-py3-none-any.whl
+```
+
 ## Optional integrations
 
 Use one requirement containing the features you need:
 
 ```text
-anyo[redis,opencode]==0.1.0a12
+anyo[redis,opencode]==0.1.0a2
 ```
 
-From a checkout, the equivalent command is `python -m pip install '.[redis,opencode]'`.
+From a checkout, the equivalent command is `python -m pip install '.[redis,opencode]'`. See [development](development.md) to install Anyo for contributing.
 
 The base package includes webhook integrations, SQLite storage, and the dashboard. The `redis` extra supplies the Python client; you also need a running Redis server. The `opencode` extra supplies the Python HTTP client; install the OpenCode executable separately. Native OmO needs its executable but no Python extra. The [prompt guide](run-prompts.md) explains the Docker option, which includes both executables.
 
